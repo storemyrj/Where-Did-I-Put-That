@@ -13,6 +13,8 @@ const USER_EMAIL_HEADER = "oai-authenticated-user-email";
 const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const USER_FULL_NAME_ENCODING_HEADER =
   "oai-authenticated-user-full-name-encoding";
+const CF_ACCESS_EMAIL_HEADER = "cf-access-authenticated-user-email";
+const CF_ACCESS_NAME_HEADER = "cf-access-authenticated-user-name";
 const PERCENT_ENCODED_UTF8 = "percent-encoded-utf-8";
 const SIGN_IN_PATH = "/signin-with-chatgpt";
 const SIGN_OUT_PATH = "/signout-with-chatgpt";
@@ -22,6 +24,19 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);
+  const cfEmail = requestHeaders.get(CF_ACCESS_EMAIL_HEADER);
+  const cfName = requestHeaders.get(CF_ACCESS_NAME_HEADER);
+
+  // Cloudflare Access is the app's authentication boundary in production.
+  // Use its verified email when the old ChatGPT connector headers are absent.
+  if ((!userId || !email) && cfEmail) {
+    return {
+      userId: `cloudflare:${cfEmail.toLowerCase()}`,
+      displayName: cfName ?? cfEmail,
+      email: cfEmail,
+      fullName: cfName,
+    };
+  }
   if (!userId || !email) return null;
 
   const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
