@@ -1,4 +1,5 @@
 node_modules/
+.sites-runtime/
 install.log
 package-lock.json
 tsconfig.tsbuildinfo
