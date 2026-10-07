@@ -1,0 +1,10 @@
+node_modules/
+install.log
+package-lock.json
+tsconfig.tsbuildinfo
+dist/
+.next/
+.wrangler/
+.env
+.env.*
+!.env.example
