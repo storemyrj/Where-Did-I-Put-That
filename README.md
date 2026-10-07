@@ -128,3 +128,5 @@ The portable build runs Vinext directly without a host `timeout` command. The ma
 ## Deployment
 
 Cloudflare deployment configuration is managed through the repository build settings.
+
+Deployment checks run from the main branch.
