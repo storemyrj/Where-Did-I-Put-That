@@ -1,5 +1,5 @@
 export type Memory={id:string;name:string;location:string[];updated_at:string;temporary_until?:string;photo?:string;history:{location:string[];timestamp:string;source:string}[]};
-export function title(s:string){return s.trim().replace(/\b\w/g,x=>x.toUpperCase());}
+export function title(s:string){return s.trim().replace(/(^|[\s-])(\p{L})/gu,(_,p,c)=>p+c.toLocaleUpperCase('nb-NO'));}
 export function parseMemory(text:string,item?:string){let s=text.trim().replace(/[.!?]+$/,'');let temporaryUntil='';const temp=s.match(/\s+(?:until|til)\s+(.+)$/i);if(temp){temporaryUntil=temp[1].trim();s=s.slice(0,temp.index).trim();}
 const direct=s.match(/^(?:i\s+)?(?:put|left|keep|kept|placed|moved|stored|set|have|la|la\s+inn|flyttet)\s+(?:my\s+|the\s+|mitt?\s+|min[et]?\s+|en\s+|et\s+)?(.+?)\s+(?:in|inside|on|at|under|beside|behind|near|by|to|i|på|ved|bak|inni|hos)\s+(?:the\s+|my\s+|den\s+|det\s+|en\s+|et\s+)?(.+)$/i);
 const state=s.match(/^(?:my\s+|the\s+|min[et]?\s+|mitt?\s+|den\s+|det\s+)?(.+?)\s+(?:is|are|was|were|er|ligger|står|befinner\s+seg)\s+(?:in|inside|on|at|under|beside|behind|near|by|i|på|ved|bak|inni)\s+(?:the\s+|my\s+|den\s+|det\s+)?(.+)$/i);
