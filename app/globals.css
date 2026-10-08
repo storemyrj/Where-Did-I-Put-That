@@ -109,3 +109,62 @@
 .suggestion-options .secondary{font-size:12px;padding:8px}
 .memory-autofill>.text-button{font-size:13px;justify-self:start}
 @media(max-width:760px){.preferences-body{padding:0 15px 18px}.location-geo-controls{align-items:stretch}.location-geo-controls>.secondary{width:100%}.memory-autofill{padding:11px}}
+
+/* Phase 3: a single primary action in the quick-add modal, details on demand. */
+.quick-memory-form{gap:14px}
+.quick-memory-form .memory-autofill{border:0;background:transparent;padding:0;gap:9px}
+.quick-memory-form .memory-autofill>label{font-size:14px;color:var(--foreground)}
+.quick-memory-form .memory-autofill-compose{align-items:stretch;gap:9px}
+.quick-memory-form .memory-autofill-compose textarea{min-height:90px;border-radius:14px;padding:13px;font-size:15px;line-height:1.5;background:var(--card)}
+.quick-memory-form .memory-voice-button{height:auto;min-height:60px;width:54px;border-radius:14px;background:var(--accent);color:var(--accent-foreground);border:1px solid #d4e5d9}
+.quick-memory-form .memory-autofill-result{background:#edf4eb;padding:12px;border:1px solid #e0e9df;border-radius:12px;line-height:1.5}
+.quick-memory-form .memory-extra-details{border:1px solid var(--border);border-radius:13px;background:var(--card);overflow:visible}
+.quick-memory-form .memory-extra-details>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:14px 15px;font-size:14px;font-weight:600;list-style-position:inside}
+.quick-memory-form .memory-extra-details>summary span{font-weight:400;color:var(--muted-foreground);font-size:11px;line-height:1.4;text-align:right}
+.quick-memory-form .memory-details-fields{display:grid;gap:16px;padding:0 15px 17px}
+.quick-memory-form .memory-details-fields>label:not(.save-location){display:grid;gap:7px;color:#65715f;font-size:13px;font-weight:600}
+.quick-memory-form .memory-details-fields .location-picker,.quick-memory-form .memory-details-fields .item-icon-picker{min-width:0}
+.quick-memory-form .memory-extra-details:focus-within{border-color:#a1c0a6}
+.quick-memory-form .primary.full{min-height:48px;font-size:15px}
+.quick-memory-form .memory-pin-options{border-top:1px solid var(--border);padding:8px 0 0}
+.quick-memory-form .memory-pin-options>summary{color:#6d806e;cursor:pointer;font-size:13px;padding:7px 0}
+.quick-memory-form .memory-pin-options[open]>summary{margin-bottom:13px}
+.quick-memory-form .memory-pin-options>label{margin:10px 0}
+.quick-memory-form .memory-pin-options>p{margin:8px 0}
+.quick-memory-form .memory-pin-options select{padding:10px;border-radius:10px;border:1px solid var(--border);background:#fff}
+@media(max-width:760px){.quick-memory-form .memory-autofill-compose textarea{font-size:16px}.quick-memory-form .memory-extra-details>summary span{max-width:46%}}
+
+/* Phase 4: purpose-built mobile entry points. Desktop retains its existing presentation. */
+.mobile-home-actions{display:none}
+@media(max-width:760px){
+  .page-home>.intro,.page-home>.search-panel,.page-home>.welcome-strip,.page-home>.memories,.page-home>.gentle-tip,.page-home>footer{display:none}
+  .page-bank>.intro,.page-bank>.search-panel,.page-bank>.gentle-tip,.page-bank>footer{display:none}
+  .page-home .mobile-home-actions{display:flex;flex-direction:column;gap:17px;max-width:520px;margin:0 auto;padding-top:3vh}
+  .mobile-home-actions h1{font-size:clamp(26px,7vw,37px);font-weight:550;letter-spacing:-1.3px;line-height:1.18;text-align:center;margin:0 0 14px;text-wrap:balance}
+  .home-action-card{background:var(--card);border:1px solid #e5e9df;border-radius:19px;box-shadow:0 5px 14px #343d260a;padding:18px;display:grid;gap:16px}
+  .home-action-heading{display:flex;align-items:center;gap:10px;color:var(--accent-foreground)}
+  .home-action-heading h2{font-size:19px;letter-spacing:-.3px;font-weight:600;color:var(--foreground)}
+  .home-action-controls{display:flex;gap:8px;align-items:center;min-width:0}
+  .home-action-controls input{min-width:0;flex:1;width:100%;border:1px solid #dce5da;border-radius:11px;background:#fbfcf9;height:47px;padding:0 11px;outline-color:var(--primary);font-size:16px}
+  .home-action-controls input::placeholder{color:#939f90}
+  .home-action-mic,.home-action-submit{display:grid;place-items:center;flex-shrink:0;width:44px;height:47px;border-radius:11px}
+  .home-action-mic{background:var(--accent);color:var(--accent-foreground)}
+  .home-action-submit{background:var(--primary);color:white}
+  .home-action-submit:disabled{opacity:.45}
+  .page-bank .memories{margin-top:4px}
+  .page-bank .memories .section-head{margin-bottom:4px}
+  .mobile-nav button{min-width:80px;min-height:45px;justify-content:center}
+  .mobile-nav button.active{color:var(--accent-foreground);font-weight:600}
+  .page-home>.result-section{margin-top:20px}
+}
+@media(max-width:365px){
+  .home-action-card{padding:14px;gap:13px}
+  .home-action-controls{gap:6px}
+  .home-action-mic,.home-action-submit{width:40px;height:43px}
+  .home-action-controls input{height:43px;font-size:15px;padding:0 8px}
+  .mobile-home-actions h1{margin-bottom:4px}
+}
+@media(min-width:761px){.page-bank>.mobile-home-actions,.page-home>.mobile-home-actions{display:none}}
+
+.quick-memory-form .memory-extra-details>summary svg{color:var(--accent-foreground);transition:transform .18s ease}
+.quick-memory-form .memory-extra-details[open]>summary svg{transform:rotate(180deg)}

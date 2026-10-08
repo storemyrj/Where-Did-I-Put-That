@@ -12,9 +12,9 @@ import {LocationEditor,locationTree,type LocationInput,type SavedLocation} from 
 
 const itemIcons=['🔑','🎧','📕','🔌','📱','👓','👛','⌚','📷','💊','🧰','🧳','🚲','🪪','📦','🧥','🎒','👜','👖','💻','📚','🔦'];
 type Draft={name:string;location:string[];locationId?:string;description:string;icon:string;source?:'typed'|'voice'|'manual edit';latitude?:number;longitude?:number;locationPrecision?:'precise'|'approximate';clearLocationPin?:boolean};
-type Props={locations:SavedLocation[];recentLocations:string[][];language:'no'|'en';preferences:AppPreferences;initial?:{name:string;location:string[];description?:string;icon?:string;saved_latitude?:number;saved_longitude?:number};onCreate:(draft:Draft)=>void;photo:File|null;onPhoto:(file:File|null)=>void;onCreateLocation:(value:LocationInput)=>Promise<string>};
+type Props={locations:SavedLocation[];recentLocations:string[][];language:'no'|'en';preferences:AppPreferences;initialStatement?:string;initialStatementSource?:'typed'|'voice';initial?:{name:string;location:string[];description?:string;icon?:string;saved_latitude?:number;saved_longitude?:number};onCreate:(draft:Draft)=>void;photo:File|null;onPhoto:(file:File|null)=>void;onCreateLocation:(value:LocationInput)=>Promise<string>};
 
-export function StructuredMemoryForm({locations,recentLocations,language,preferences,onCreate,photo,onPhoto,onCreateLocation,initial}:Props){
+export function StructuredMemoryForm({locations,recentLocations,language,preferences,initialStatement='',initialStatementSource='typed',onCreate,photo,onPhoto,onCreateLocation,initial}:Props){
   const no=language==='no';
   const [name,setName]=useState(initial?.name||'');
   const [statement,setStatement]=useState('');
@@ -23,6 +23,11 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
   const [suggestionStatus,setSuggestionStatus]=useState('');
   const [listening,setListening]=useState(false);
   const recognition=useRef<{start():void;stop():void;abort():void}|null>(null);
+  const detailsRef=useRef<HTMLDetailsElement>(null);
+  const pinRef=useRef<HTMLDetailsElement>(null);
+  const nameRef=useRef<HTMLInputElement>(null);
+  const lastIncomingStatement=useRef('');
+  const [validationHint,setValidationHint]=useState('');
   const locationTouched=useRef(false),nameTouched=useRef(!!initial),noteTouched=useRef(!!initial?.description),attemptedPosition=useRef(false);
   const [note,setNote]=useState(initial?.description||'');
   const [selected,setSelected]=useState(()=>locationTree(locations).find(entry=>entry.path.join(' → ')===initial?.location.join(' → '))?.location.id||'');
@@ -32,11 +37,27 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
   const [saveCurrentLocation,setSaveCurrentLocation]=useState(false);
   const hasExistingPin=typeof initial?.saved_latitude==='number'&&typeof initial?.saved_longitude==='number';
   const [keepExistingPin,setKeepExistingPin]=useState(hasExistingPin);
+  useEffect(()=>{
+    if(initial&&detailsRef.current)detailsRef.current.open=true;
+    if(hasExistingPin&&pinRef.current)pinRef.current.open=true;
+  },[initial,hasExistingPin]);
   const [precision,setPrecision]=useState<'precise'|'approximate'>(preferences.locationMode==='precise'?'precise':'approximate');
   const [locationStatus,setLocationStatus]=useState('');
   const [busy,setBusy]=useState(false);
   const paths=useMemo(()=>locationTree(locations),[locations]);
   const suggestion=useMemo(()=>suggestMemory(statement,locations,position),[statement,locations,position]);
+  useEffect(()=>{
+    if(!initialStatement||initialStatement===lastIncomingStatement.current)return;
+    lastIncomingStatement.current=initialStatement;
+    const pending=Promise.resolve().then(()=>{
+      const parsed=suggestMemory(initialStatement,locations,position);
+      setStatement(initialStatement);setInputSource(initialStatementSource);
+      if(parsed.itemName&&!nameTouched.current)setName(parsed.itemName);
+      if(parsed.note&&!noteTouched.current)setNote(parsed.note);
+      if(!locationTouched.current)setSelected(parsed.best?.id||'');
+    });
+    void pending;
+  },[initialStatement,initialStatementSource,locations,position]);
   function interpret(value:string,source:'typed'|'voice'){
     setStatement(value);setInputSource(source);
     const parsed=suggestMemory(value,locations,position);
@@ -92,7 +113,15 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
   },[paths,recentLocations]);
 
   function submit(e:FormEvent){
-    e.preventDefault();if(!name.trim()||busy)return;
+    e.preventDefault();
+    if(busy)return;
+    if(!name.trim()){
+      detailsRef.current?.setAttribute('open','');
+      setValidationHint(no?'Skriv hva du vil huske, eller fyll inn navnet under Detaljer.':'Describe the item, or enter its name in Details.');
+      requestAnimationFrame(()=>nameRef.current?.focus());
+      return;
+    }
+    setValidationHint('');
     const match=paths.find(p=>p.location.id===selected);
     const create=(position?:Coordinate)=>{
       const latitude=position?.latitude,longitude=position?.longitude;
@@ -105,10 +134,10 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
       .then(location=>create(location))
       .catch(()=>{setLocationStatus(no?'Kunne ikke hente posisjon. Minnet kan fortsatt lagres.':'Could not get your location. You can still save the memory.');create();});
   }
-  return <form className="structured-memory-form" onSubmit={submit}>
-    <div className="memory-autofill"><label htmlFor="memory-autofill-input">{no?'Fortell hva du vil huske':'Describe what to remember'}</label>
+  return <form className="structured-memory-form quick-memory-form" onSubmit={submit}>
+    <div className="memory-autofill"><label htmlFor="memory-autofill-input">{no?'Hva vil du huske?':'What should I remember?'}</label>
       <div className="memory-autofill-compose"><textarea id="memory-autofill-input" value={statement} onChange={e=>interpret(e.target.value,'typed')} placeholder={no?'Jeg la PC-en i sekken på soverommet …':'I put my laptop in the bag in the bedroom …'} rows={2}/>
-        <button type="button" className={'mic '+(listening?'listening':'')} onClick={voiceInput} disabled={!preferences.microphoneEnabled} title={no?'Fortell med stemmen':'Speak'} aria-label={no?'Fortell med stemmen':'Speak'}><Mic size={22}/></button>
+        <button type="button" className={'mic memory-voice-button '+(listening?'listening':'')} onClick={voiceInput} disabled={!preferences.microphoneEnabled} title={no?'Fortell med stemmen':'Speak'} aria-label={no?'Fortell med stemmen':'Speak'}><Mic size={22}/></button>
       </div>
       {suggestion.itemName&&<div className="memory-autofill-result"><span>{no?'Tolket ting:':'Detected item:'} <strong>{suggestion.itemName}</strong> {emoji(suggestion.itemName)}</span>
        {suggestion.best&&<span>{no?'Foreslått sted:':'Suggested place:'} <strong>{suggestion.best.path.join(' → ')}</strong>{suggestion.best.nearby?' · '+(no?'nær deg':'nearby'):''}</span>}
@@ -120,7 +149,10 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
       {suggestionStatus&&<p className="small muted" role="status">{suggestionStatus}</p>}
       {!preferences.microphoneEnabled&&<p className="small muted">{no?'Mikrofon er deaktivert i Innstillinger.':'Microphone is disabled in Settings.'}</p>}
     </div>
-    <label>{no?'Hva vil du huske?':'What should I remember?'}<input value={name} onChange={e=>{nameTouched.current=true;setName(e.target.value);}} placeholder={no?'For eksempel: Passet':'For example: Passport'} autoFocus maxLength={120} required/></label>
+    <details ref={detailsRef} className="memory-extra-details" key={initial?'edit-details':'add-details'}>
+      <summary>{no?'Detaljer (valgfritt)':'Details (optional)'}<ChevronDown size={18} aria-hidden="true"/></summary>
+      <div className="memory-details-fields">
+    <label>{no?'Hva vil du huske?':'What should I remember?'}<input ref={nameRef} value={name} onChange={e=>{nameTouched.current=true;setName(e.target.value);}} placeholder={no?'For eksempel: Passet':'For example: Passport'} maxLength={120}/></label>
     <div className="item-icon-picker"><span>{no?'Ikon':'Icon'}</span><button type="button" className="selected-item-icon" onClick={()=>setShowIcons(v=>!v)} aria-expanded={showIcons}>{icon||emoji(name)}<ChevronDown size={15}/></button>{showIcons&&<div className="item-icon-options"><button type="button" className={!icon?'selected':''} onClick={()=>{setIcon('');setShowIcons(false);}}>{no?'Automatisk':'Auto'}</button>{itemIcons.map(value=><button type="button" key={value} className={icon===value?'selected':''} onClick={()=>{setIcon(value);setShowIcons(false);}}>{value}</button>)}</div>}</div>
     <div className="location-picker">
       <span>{no?'Velg plassering':'Choose a location'}</span>
@@ -131,12 +163,18 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
       <p className="small muted">{no?'Uten valgt sted lagres minnet i Usortert.':'Without a selected place, this memory is saved in Unsorted.'}</p>
     </div>
     <label>{no?'Valgfritt notat':'Optional note'}<textarea value={note} onChange={e=>{noteTouched.current=true;setNote(e.target.value);}} placeholder={no?'Skriv en beskrivelse hvis det hjelper':'Add a description if useful'}/></label>
+    <details ref={pinRef} className="memory-pin-options">
+      <summary>{no?'Kartpin (valgfritt)':'Map pin (optional)'}</summary>
     {preferences.locationMode!=='off'&&<label className="save-location"><input type="checkbox" checked={saveCurrentLocation} onChange={e=>setSaveCurrentLocation(e.target.checked)}/><span>{no?'Legg ved kartpin der jeg er nå':'Attach a map pin where I am now'}<small>{no?'Kun dette minnet. Ingen løpende sporing.':'This memory only. No ongoing tracking.'}</small></span></label>}
     {preferences.locationMode==='off'&&<p className="small muted">{no?'Posisjon er deaktivert i Innstillinger.':'Location is disabled in Settings.'}</p>}
     {hasExistingPin&&<label className="save-location"><input type="checkbox" checked={keepExistingPin} onChange={e=>setKeepExistingPin(e.target.checked)}/><span>{no?'Behold eksisterende kartpin':'Keep existing map pin'}</span></label>}
     {saveCurrentLocation&&<label>{no?'Nøyaktighet':'Location accuracy'}<select value={precision} onChange={e=>setPrecision(e.target.value as 'precise'|'approximate')}><option value="approximate">{no?'Omtrentlig (ca. 1 km)':'Approximate (about 1 km)'}</option><option value="precise">{no?'Presis posisjon':'Precise location'}</option></select></label>}
     {locationStatus&&<p className="small muted" role="status">{locationStatus}</p>}
+    </details>
     <PhotoPicker file={photo} onChange={onPhoto} language={language}/>
-    <button className="primary full" disabled={!name.trim()||busy}><Plus size={17}/>{busy?(no?'Henter posisjon …':'Getting location …'):(initial?(no?'Lagre endringer':'Save changes'):(no?'Opprett minne':'Create memory'))}</button>
+      </div>
+    </details>
+    {validationHint&&<p role="alert" className="error">{validationHint}</p>}
+    <button className="primary full" disabled={busy}><Plus size={17}/>{busy?(no?'Henter posisjon …':'Getting location …'):(initial?(no?'Lagre endringer':'Save changes'):(no?'Opprett minne':'Create memory'))}</button>
   </form>;
 }
