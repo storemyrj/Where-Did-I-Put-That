@@ -12,17 +12,16 @@ import {LocationEditor,locationTree,type LocationInput,type SavedLocation} from 
 
 const itemIcons=['🔑','🎧','📕','🔌','📱','👓','👛','⌚','📷','💊','🧰','🧳','🚲','🪪','📦','🧥','🎒','👜','👖','💻','📚','🔦'];
 type Draft={name:string;location:string[];locationId?:string;description:string;icon:string;source?:'typed'|'voice'|'manual edit';latitude?:number;longitude?:number;locationPrecision?:'precise'|'approximate';clearLocationPin?:boolean};
-type Props={locations:SavedLocation[];recentLocations:string[][];language:'no'|'en';preferences:AppPreferences;initialStatement?:string;initialStatementSource?:'typed'|'voice';initial?:{name:string;location:string[];description?:string;icon?:string;saved_latitude?:number;saved_longitude?:number};onCreate:(draft:Draft)=>void;photo:File|null;onPhoto:(file:File|null)=>void;onCreateLocation:(value:LocationInput)=>Promise<string>};
+type Props={locations:SavedLocation[];recentLocations:string[][];language:'no'|'en';preferences:AppPreferences;onVoice:()=>void;listening:boolean;initialStatement?:string;initialStatementSource?:'typed'|'voice';initial?:{name:string;location:string[];description?:string;icon?:string;saved_latitude?:number;saved_longitude?:number};onCreate:(draft:Draft)=>void;photo:File|null;onPhoto:(file:File|null)=>void;onCreateLocation:(value:LocationInput)=>Promise<string>};
 
-export function StructuredMemoryForm({locations,recentLocations,language,preferences,initialStatement='',initialStatementSource='typed',onCreate,photo,onPhoto,onCreateLocation,initial}:Props){
+export function StructuredMemoryForm({locations,recentLocations,language,preferences,onVoice,listening,initialStatement='',initialStatementSource='typed',onCreate,photo,onPhoto,onCreateLocation,initial}:Props){
   const no=language==='no';
   const [name,setName]=useState(initial?.name||'');
   const [statement,setStatement]=useState('');
   const [inputSource,setInputSource]=useState<'typed'|'voice'|'manual edit'>('typed');
   const [position,setPosition]=useState<Coordinate|null>(null);
   const [suggestionStatus,setSuggestionStatus]=useState('');
-  const [listening,setListening]=useState(false);
-  const recognition=useRef<{start():void;stop():void;abort():void}|null>(null);
+  const [showTextInput,setShowTextInput]=useState(Boolean(initialStatement)&&initialStatementSource==='typed');
   const detailsRef=useRef<HTMLDetailsElement>(null);
   const pinRef=useRef<HTMLDetailsElement>(null);
   const nameRef=useRef<HTMLInputElement>(null);
@@ -31,6 +30,7 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
   const locationTouched=useRef(false),nameTouched=useRef(!!initial),noteTouched=useRef(!!initial?.description),attemptedPosition=useRef(false);
   const [note,setNote]=useState(initial?.description||'');
   const [selected,setSelected]=useState(()=>locationTree(locations).find(entry=>entry.path.join(' → ')===initial?.location.join(' → '))?.location.id||'');
+  const [manualLocationSelected,setManualLocationSelected]=useState(false);
   const [icon,setIcon]=useState(initial?.icon||'');
   const [showIcons,setShowIcons]=useState(false);
   const [showNew,setShowNew]=useState(false);
@@ -52,7 +52,7 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
     const pending=Promise.resolve().then(()=>{
       const parsed=suggestMemory(initialStatement,locations,position);
       setStatement(initialStatement);setInputSource(initialStatementSource);
-      if(parsed.itemName&&!nameTouched.current)setName(parsed.itemName);
+      if(!nameTouched.current)setName(parsed.itemName||(initialStatement.trim().length<=80&&!/\s(?:i|på|in|at|under|ved)\s/i.test(initialStatement)?initialStatement.trim():''));
       if(parsed.note&&!noteTouched.current)setNote(parsed.note);
       if(!locationTouched.current)setSelected(parsed.best?.id||'');
     });
@@ -61,7 +61,7 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
   function interpret(value:string,source:'typed'|'voice'){
     setStatement(value);setInputSource(source);
     const parsed=suggestMemory(value,locations,position);
-    if(parsed.itemName&&!nameTouched.current)setName(parsed.itemName);
+    if(!nameTouched.current)setName(parsed.itemName||(value.trim().length<=80&&!/\s(?:i|på|in|at|under|ved)\s/i.test(value)?value.trim():''));
     if(parsed.note&&!noteTouched.current)setNote(parsed.note);
     if(!locationTouched.current)setSelected(parsed.best?.id||'');
   }
@@ -87,21 +87,6 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
   // Position lookup is deliberately triggered only once, after a recognized ambiguous phrase.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[statement,suggestion.ambiguous,preferences.locationMode]);
-  useEffect(()=>()=>recognition.current?.abort(),[]);
-  function voiceInput(){
-    if(!preferences.microphoneEnabled)return;
-    if(listening){recognition.current?.stop();return;}
-    const SpeechAPI=(window as any).SpeechRecognition||(window as any).webkitSpeechRecognition;
-    if(!SpeechAPI){setSuggestionStatus(no?'Tale støttes ikke i nettleseren.':'Speech recognition is not supported here.');return;}
-    const speaker=new SpeechAPI();recognition.current=speaker;
-    const voiceLang=preferences.speechLanguage==='auto'?language:preferences.speechLanguage;
-    speaker.lang=voiceLang==='no'?'nb-NO':'en-US';speaker.interimResults=false;
-    speaker.onstart=()=>setListening(true);
-    speaker.onend=()=>setListening(false);
-    speaker.onerror=()=>{setListening(false);setSuggestionStatus(no?'Kunne ikke bruke mikrofonen. Kontroller tillatelsen.':'Could not use the microphone. Check its permission.');};
-    speaker.onresult=(event:any)=>{interpret(event.results[0][0].transcript,'voice');setListening(false);};
-    try{speaker.start();}catch{setSuggestionStatus(no?'Kunne ikke starte mikrofonen.':'Could not start the microphone.');}
-  }
   const recent=useMemo(()=>{
     const selectedIds=new Set<string>();
     for(const recentPath of recentLocations){
@@ -115,10 +100,11 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
   function submit(e:FormEvent){
     e.preventDefault();
     if(busy)return;
-    if(!name.trim()){
+    if(!name.trim()||(suggestion.placeDescription&&!selected&&!locationTouched.current)){
       detailsRef.current?.setAttribute('open','');
-      setValidationHint(no?'Skriv hva du vil huske, eller fyll inn navnet under Detaljer.':'Describe the item, or enter its name in Details.');
-      requestAnimationFrame(()=>nameRef.current?.focus());
+      const needsPlace=!!name.trim();
+      setValidationHint(needsPlace?(no?'Jeg fant ikke en sikker plassering. Velg et sted, opprett et nytt, eller velg Usortert under Flere valg.':'I could not identify one location. Select an existing place, create one or choose Unsorted in More options.'):(no?'Fortell hva du vil huske, eller skriv inn navnet under Flere valg.':'Tell me what to remember, or enter the name under More options.'));
+      if(!needsPlace)requestAnimationFrame(()=>nameRef.current?.focus());
       return;
     }
     setValidationHint('');
@@ -134,32 +120,76 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
       .then(location=>create(location))
       .catch(()=>{setLocationStatus(no?'Kunne ikke hente posisjon. Minnet kan fortsatt lagres.':'Could not get your location. You can still save the memory.');create();});
   }
+  const chosen=paths.find(entry=>entry.location.id===selected);
+  const hasProposedMemory=!!name.trim()||!!suggestion.placeDescription||!!statement.trim();
+  const ambiguousPlace=!!suggestion.placeDescription&&!selected&&!manualLocationSelected;
   return <form className="structured-memory-form quick-memory-form" onSubmit={submit}>
-    <div className="memory-autofill"><label htmlFor="memory-autofill-input">{no?'Hva vil du huske?':'What should I remember?'}</label>
-      <div className="memory-autofill-compose"><textarea id="memory-autofill-input" value={statement} onChange={e=>interpret(e.target.value,'typed')} placeholder={no?'Jeg la PC-en i sekken på soverommet …':'I put my laptop in the bag in the bedroom …'} rows={2}/>
-        <button type="button" className={'mic memory-voice-button '+(listening?'listening':'')} onClick={voiceInput} disabled={!preferences.microphoneEnabled} title={no?'Fortell med stemmen':'Speak'} aria-label={no?'Fortell med stemmen':'Speak'}><Mic size={22}/></button>
-      </div>
-      {suggestion.itemName&&<div className="memory-autofill-result"><span>{no?'Tolket ting:':'Detected item:'} <strong>{suggestion.itemName}</strong> {emoji(suggestion.itemName)}</span>
-       {suggestion.best&&<span>{no?'Foreslått sted:':'Suggested place:'} <strong>{suggestion.best.path.join(' → ')}</strong>{suggestion.best.nearby?' · '+(no?'nær deg':'nearby'):''}</span>}
-       {suggestion.ambiguous&&<span>{no?'Flere steder passer. Velg riktig nedenfor.':'Several places match. Choose below.'}</span>}
-       {!suggestion.candidates.length&&suggestion.placeDescription&&<span>{no?'Stedet finnes ikke ennå. Velg eller opprett et sted nedenfor.':'Place not found yet. Select or create a location below.'}</span>}
-       {suggestion.ambiguous&&<div className="suggestion-options">{suggestion.candidates.map(candidate=><button className="secondary" type="button" key={candidate.id} onClick={()=>{setSelected(candidate.id);locationTouched.current=true;}}>{candidate.path.join(' → ')}{candidate.nearby?' · '+(no?'nær deg':'nearby'):''}</button>)}</div>}
+    <section className={'memory-voice-entry '+(statement.trim()&&!listening?'has-content':'')} aria-label={no?'Legg til minne med tale eller tekst':'Remember using voice or text'}>
+      <button type="button" className={'memory-voice-primary '+(listening?'listening is-listening':'')} onClick={onVoice}
+        disabled={!preferences.microphoneEnabled}
+        aria-label={listening?(no?'Stopp taleopptak':'Stop listening'):(no?'Start tale':'Start speech recognition')}>
+        <span className="memory-voice-orb"><Mic size={34}/></span>
+        <span className="memory-voice-label">{listening?(no?'Jeg lytter …':'Listening …'):(statement?(no?'Fortell noe mer':'Speak again'):(no?'Trykk for å fortelle':'Tap to speak'))}</span>
+      </button>
+      {listening&&<p role="status" className="memory-listening-hint">{no?'Trykk igjen for å stoppe.':'Tap again to stop.'}</p>}
+      <button type="button" className="memory-type-toggle" aria-expanded={showTextInput}
+        onClick={()=>setShowTextInput(value=>!value)}>
+        {showTextInput?(no?'Skjul tekstfelt':'Hide text input'):(statement?(no?'Rediger teksten':'Edit the text'):(no?'Skriv i stedet':'Type instead'))}
+      </button>
+      {showTextInput?<label className="memory-statement-field" htmlFor="memory-autofill-input">
+        {no?'Beskriv minnet':'Describe the memory'}
+        <textarea id="memory-autofill-input" value={statement} onChange={e=>interpret(e.target.value,'typed')}
+          placeholder={no?'Jeg la PC-en i sekken på soverommet …':'I put my laptop in the bag in the bedroom …'} rows={3}/>
+      </label>:statement.trim()&&<div className="memory-transcript">
+        <span className="memory-transcript-caption">{no?'Du fortalte:':'You said:'}</span>
+        <p>{statement}</p>
       </div>}
-      {preferences.locationMode!=='off'&&statement.trim()&&suggestion.candidates.length>1&&<button className="text-button" type="button" onClick={()=>void requestPosition()}>{no?'Bruk min posisjon for å foreslå sted':'Use my location to suggest a place'}</button>}
+      {!preferences.microphoneEnabled&&<p className="small muted">{no?'Mikrofon er deaktivert i Innstillinger. Velg «Skriv i stedet».':'Microphone is disabled in Settings. Choose Type instead.'}</p>}
+    </section>
+    {hasProposedMemory&&<section className="memory-autofill-summary" aria-label={no?'Foreslått minne':'Suggested memory'}>
+      <div className="memory-summary-top">
+        <span>{no?'FORESLÅTT MINNE':'SUGGESTED MEMORY'}</span>
+        <button type="button" className="text-button" onClick={()=>{if(detailsRef.current){detailsRef.current.open=true;detailsRef.current.scrollIntoView({block:'nearest',behavior:'smooth'});}}}>
+          {no?'Rediger':'Edit'} <ChevronDown size={15}/>
+        </button>
+      </div>
+      <div className="memory-summary-item">
+        <span className="memory-summary-icon" aria-hidden="true">{icon||emoji(name)}</span>
+        <div>
+          <strong>{name|| (no?'Ukjent ting':'Unknown item')}</strong>
+          <p>{chosen?.path.join(' → ')||(no?'Ingen plassering valgt':'No location selected')}{chosen&&suggestion.best?.id===chosen.location.id&&suggestion.best.nearby?(no?' · nær deg':' · nearby'):''}</p>
+        </div>
+      </div>
+      {note.trim()&&<p className="memory-summary-note">{no?'Notat:':'Note:'} {note}</p>}
+      {suggestion.ambiguous&&!manualLocationSelected&&<p className="memory-summary-warning">{no?'Flere steder passer. Velg riktig sted:':'Several places match. Choose the correct location:'}</p>}
+      {ambiguousPlace&&!suggestion.ambiguous&&<p className="memory-summary-warning">{no?'Jeg fant ikke dette stedet sikkert. Velg eller opprett et sted under Flere valg, eller fortsett uten sted.':'I could not confidently identify this place. Select or create one in More options, or continue without a place.'}</p>}
+      {!!suggestion.placeDescription&&!selected&&!manualLocationSelected&&<button type="button" className="memory-unsorted-button secondary"
+        onClick={()=>{locationTouched.current=true;setManualLocationSelected(true);setSelected('');}}>
+        {no?'Fortsett uten sted (Usortert)':'Continue without a place (Unsorted)'}
+      </button>}
+      {suggestion.ambiguous&&!manualLocationSelected&&<div className="suggestion-options">
+        {suggestion.candidates.map(candidate=><button type="button" className="secondary" key={candidate.id}
+          onClick={()=>{setSelected(candidate.id);locationTouched.current=true;setManualLocationSelected(true);}}>
+          {candidate.path.join(' → ')}{candidate.nearby?(no?' · nær deg':' · nearby'):''}
+        </button>)}
+      </div>}
+      {preferences.locationMode!=='off'&&suggestion.ambiguous&&!manualLocationSelected&&<button
+        type="button" className="text-button" onClick={()=>void requestPosition()}>
+        {no?'Bruk posisjon til stedsforslag':'Use location to help choose a place'}
+      </button>}
       {suggestionStatus&&<p className="small muted" role="status">{suggestionStatus}</p>}
-      {!preferences.microphoneEnabled&&<p className="small muted">{no?'Mikrofon er deaktivert i Innstillinger.':'Microphone is disabled in Settings.'}</p>}
-    </div>
+    </section>}
     <details ref={detailsRef} className="memory-extra-details" key={initial?'edit-details':'add-details'}>
-      <summary>{no?'Detaljer (valgfritt)':'Details (optional)'}<ChevronDown size={18} aria-hidden="true"/></summary>
+      <summary>{no?'Flere valg':'More options'}<ChevronDown size={18} aria-hidden="true"/></summary>
       <div className="memory-details-fields">
     <label>{no?'Hva vil du huske?':'What should I remember?'}<input ref={nameRef} value={name} onChange={e=>{nameTouched.current=true;setName(e.target.value);}} placeholder={no?'For eksempel: Passet':'For example: Passport'} maxLength={120}/></label>
     <div className="item-icon-picker"><span>{no?'Ikon':'Icon'}</span><button type="button" className="selected-item-icon" onClick={()=>setShowIcons(v=>!v)} aria-expanded={showIcons}>{icon||emoji(name)}<ChevronDown size={15}/></button>{showIcons&&<div className="item-icon-options"><button type="button" className={!icon?'selected':''} onClick={()=>{setIcon('');setShowIcons(false);}}>{no?'Automatisk':'Auto'}</button>{itemIcons.map(value=><button type="button" key={value} className={icon===value?'selected':''} onClick={()=>{setIcon(value);setShowIcons(false);}}>{value}</button>)}</div>}</div>
     <div className="location-picker">
       <span>{no?'Velg plassering':'Choose a location'}</span>
-      {recent.length>0&&<><small className="muted">{no?'Nylig brukt':'Recently used'}</small><div className="quick-location-list">{recent.map(({location,path})=><button type="button" key={location.id} className={selected===location.id?'selected secondary':'secondary'} onClick={()=>{locationTouched.current=true;setSelected(location.id);}}><LocationIcon icon={location.icon} name={location.name} size={15}/>{path.join(' → ')}</button>)}</div></>}
-      <select value={selected} onChange={e=>{locationTouched.current=true;setSelected(e.target.value);}} aria-label={no?'Velg eksisterende sted':'Choose an existing place'}><option value="">{no?'Usortert (uten sted)':'Unsorted (no location)'}</option>{paths.map(({location,depth,path})=><option key={location.id} value={location.id}>{'　'.repeat(depth)}{path.join(' → ')}</option>)}</select>
+      {recent.length>0&&<><small className="muted">{no?'Nylig brukt':'Recently used'}</small><div className="quick-location-list">{recent.map(({location,path})=><button type="button" key={location.id} className={selected===location.id?'selected secondary':'secondary'} onClick={()=>{locationTouched.current=true;setManualLocationSelected(true);setSelected(location.id);}}><LocationIcon icon={location.icon} name={location.name} size={15}/>{path.join(' → ')}</button>)}</div></>}
+      <select value={selected} onChange={e=>{locationTouched.current=true;setManualLocationSelected(true);setSelected(e.target.value);}} aria-label={no?'Velg eksisterende sted':'Choose an existing place'}><option value="">{no?'Usortert (uten sted)':'Unsorted (no location)'}</option>{paths.map(({location,depth,path})=><option key={location.id} value={location.id}>{'　'.repeat(depth)}{path.join(' → ')}</option>)}</select>
       <button type="button" className="text-button" onClick={()=>setShowNew(v=>!v)}><Plus size={15}/>{no?'Legg til ny plassering':'Add new location'}</button>
-      {showNew&&<LocationEditor locations={locations} language={language} initialParent={selected} locationMode={preferences.locationMode} onSave={async value=>{const id=await onCreateLocation(value);setSelected(id);setShowNew(false);}} onCancel={()=>setShowNew(false)}/>}
+      {showNew&&<LocationEditor locations={locations} language={language} initialParent={selected} locationMode={preferences.locationMode} onSave={async value=>{const id=await onCreateLocation(value);setSelected(id);locationTouched.current=true;setManualLocationSelected(true);setShowNew(false);}} onCancel={()=>setShowNew(false)}/>}
       <p className="small muted">{no?'Uten valgt sted lagres minnet i Usortert.':'Without a selected place, this memory is saved in Unsorted.'}</p>
     </div>
     <label>{no?'Valgfritt notat':'Optional note'}<textarea value={note} onChange={e=>{noteTouched.current=true;setNote(e.target.value);}} placeholder={no?'Skriv en beskrivelse hvis det hjelper':'Add a description if useful'}/></label>
@@ -171,9 +201,12 @@ export function StructuredMemoryForm({locations,recentLocations,language,prefere
     {saveCurrentLocation&&<label>{no?'Nøyaktighet':'Location accuracy'}<select value={precision} onChange={e=>setPrecision(e.target.value as 'precise'|'approximate')}><option value="approximate">{no?'Omtrentlig (ca. 1 km)':'Approximate (about 1 km)'}</option><option value="precise">{no?'Presis posisjon':'Precise location'}</option></select></label>}
     {locationStatus&&<p className="small muted" role="status">{locationStatus}</p>}
     </details>
-    <PhotoPicker file={photo} onChange={onPhoto} language={language}/>
       </div>
     </details>
+    <section className="memory-photo-section" aria-label={no?'Bilde':'Photo'}>
+      <h3>{no?'Legg til bilde (valgfritt)':'Add a photo (optional)'}</h3>
+      <PhotoPicker file={photo} onChange={onPhoto} language={language}/>
+    </section>
     {validationHint&&<p role="alert" className="error">{validationHint}</p>}
     <button className="primary full" disabled={busy}><Plus size={17}/>{busy?(no?'Henter posisjon …':'Getting location …'):(initial?(no?'Lagre endringer':'Save changes'):(no?'Opprett minne':'Create memory'))}</button>
   </form>;
