@@ -1,5 +1,6 @@
 import { getChatGPTUser } from '../../chatgpt-auth';
 import { database, bucket } from '@/lib/storage';
+import {isLocationMode,isSpeechLanguage,DEFAULT_PREFERENCES} from '@/lib/preferences';
 
 const json=(body:unknown,status=200)=>Response.json(body,{status});
 
@@ -14,7 +15,7 @@ export async function GET(){
       db.prepare('SELECT h.* FROM location_history h JOIN items i ON i.id=h.item_id WHERE i.user_id=? ORDER BY timestamp DESC').bind(u.userId).all(),
       db.prepare('SELECT * FROM users WHERE id=?').bind(u.userId).first(),
     ]);
-    return json({items:items.results,locations:locations.results,history:history.results,user:{name:u.fullName,email:u.email},notifications:profile?.notifications??'off'});
+    return json({items:items.results,locations:locations.results,history:history.results,user:{name:u.fullName,email:u.email},notifications:profile?.notifications??'off',preferences:{locationMode:profile?.location_mode??DEFAULT_PREFERENCES.locationMode,microphoneEnabled:profile?.microphone_enabled!=='off',speechLanguage:profile?.speech_language??DEFAULT_PREFERENCES.speechLanguage}});
   }catch(e){console.error(e);return json({error:'Your memories are unavailable right now. Please try again.'},503);}
 }
 
@@ -41,6 +42,12 @@ export async function POST(req:Request){
     const db=database();
     const now=new Date().toISOString();
 
+    if(p.action==='preferences'){
+      if(!isLocationMode(p.locationMode)||typeof p.microphoneEnabled!=='boolean'||!isSpeechLanguage(p.speechLanguage))return json({error:'Invalid settings.'},400);
+      await db.prepare('INSERT INTO users (id,name,email,created_at,location_mode,microphone_enabled,speech_language) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET location_mode=excluded.location_mode,microphone_enabled=excluded.microphone_enabled,speech_language=excluded.speech_language').bind(u.userId,u.fullName,u.email,now,p.locationMode,p.microphoneEnabled?'on':'off',p.speechLanguage).run();
+      return json({ok:true});
+    }
+
     if(p.action==='notifications'){
       await db.prepare('INSERT INTO users (id,name,email,created_at,notifications) VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET notifications=excluded.notifications').bind(u.userId,u.fullName,u.email,now,p.enabled?'on':'off').run();
       return json({ok:true});
@@ -66,8 +73,19 @@ export async function POST(req:Request){
       if(duplicate)return json({error:'A location with this name already exists here.'},409);
       const address=parentId?null:typeof p.address==='string'?p.address.trim().slice(0,250)||null:null;
       const icon=typeof p.icon==='string'&&/^[a-z-]{1,30}$/.test(p.icon)?p.icon:null;
-      if(updating)await db.prepare('UPDATE locations SET name=?,parent_location_id=?,address=?,icon=? WHERE id=? AND user_id=?').bind(p.name.trim(),parentId,address,icon,id,u.userId).run();
-      else await db.prepare('INSERT INTO locations (id,user_id,name,parent_location_id,address,icon) VALUES (?,?,?,?,?,?)').bind(id,u.userId,p.name.trim(),parentId,address,icon).run();
+      const hasLatitude=p.latitude!==null&&p.latitude!==undefined,hasLongitude=p.longitude!==null&&p.longitude!==undefined;
+      if(hasLatitude!==hasLongitude)return json({error:'Both coordinates are required.'},400);
+      if(hasLatitude&&(!Number.isFinite(p.latitude)||!Number.isFinite(p.longitude)||Math.abs(p.latitude)>90||Math.abs(p.longitude)>180))return json({error:'Invalid coordinates.'},400);
+      if(hasLatitude&&p.geoPrecision!=='precise'&&p.geoPrecision!=='approximate')return json({error:'Invalid location precision.'},400);
+      const geoChanged=p.updateCoordinates===true;
+      if(geoChanged&&!hasLatitude&&p.geoPrecision!=null)return json({error:'Coordinates must be provided.'},400);
+      const coordinateArgs=geoChanged?[hasLatitude?p.latitude:null,hasLatitude?p.longitude:null,hasLatitude?p.geoPrecision:null]:[];
+      if(updating){
+        if(geoChanged)await db.prepare('UPDATE locations SET name=?,parent_location_id=?,address=?,icon=?,latitude=?,longitude=?,geo_precision=? WHERE id=? AND user_id=?').bind(p.name.trim(),parentId,address,icon,...coordinateArgs,id,u.userId).run();
+        else await db.prepare('UPDATE locations SET name=?,parent_location_id=?,address=?,icon=? WHERE id=? AND user_id=?').bind(p.name.trim(),parentId,address,icon,id,u.userId).run();
+      }else{
+        await db.prepare('INSERT INTO locations (id,user_id,name,parent_location_id,address,icon,latitude,longitude,geo_precision) VALUES (?,?,?,?,?,?,?,?,?)').bind(id,u.userId,p.name.trim(),parentId,address,icon,hasLatitude?p.latitude:null,hasLatitude?p.longitude:null,hasLatitude?p.geoPrecision:null).run();
+      }
       return json({ok:true,id});
     }
 
@@ -113,7 +131,17 @@ export async function POST(req:Request){
     const coordinates=hasLatitude&&hasLongitude;
     if(coordinates&&(!Number.isFinite(p.latitude)||!Number.isFinite(p.longitude)||p.latitude < -90||p.latitude > 90||p.longitude < -180||p.longitude > 180))return json({error:'Invalid map coordinates.'},400);
     const fallback=p.language==='en'?'Unsorted':'Usortert';
-    const {id:locationId,statements}=await ensureLocation(db,u.userId,Array.isArray(p.location)?p.location:[],fallback);
+    let locationId:string;
+    let statements:Awaited<ReturnType<typeof ensureLocation>>['statements']=[];
+    if(p.locationId!=null){
+      if(typeof p.locationId!=='string')return json({error:'Invalid location selection.'},400);
+      const owned=await db.prepare('SELECT id FROM locations WHERE id=? AND user_id=?').bind(p.locationId,u.userId).first<{id:string}>();
+      if(!owned)return json({error:'Location not found.'},400);
+      locationId=owned.id;
+    }else{
+      const result=await ensureLocation(db,u.userId,Array.isArray(p.location)?p.location:[],fallback);
+      locationId=result.id;statements=result.statements;
+    }
     const id=existing?.id??crypto.randomUUID();
     statements.push(db.prepare('INSERT INTO users (id,name,email,created_at) VALUES (?,?,?,?) ON CONFLICT(id) DO NOTHING').bind(u.userId,u.fullName,u.email,now));
 

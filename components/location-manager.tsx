@@ -3,9 +3,11 @@
 import {useMemo,useState} from 'react';
 import {Check,Ellipsis,Plus,Trash2,X} from 'lucide-react';
 import {LocationIcon,locationIconChoices,suggestedLocationIcon} from '@/components/location-icon';
+import {getPositionOnce} from '@/lib/client-geolocation';
+import type {LocationMode} from '@/lib/preferences';
 
-export type SavedLocation={id:string;name:string;parent_location_id:string|null;address?:string|null;icon?:string|null};
-export type LocationInput={name:string;parentId:string|null;address:string|null;icon:string|null};
+export type SavedLocation={id:string;name:string;parent_location_id:string|null;address?:string|null;icon?:string|null;latitude?:number|null;longitude?:number|null;geo_precision?:'approximate'|'precise'|null};
+export type LocationInput={name:string;parentId:string|null;address:string|null;icon:string|null;latitude?:number|null;longitude?:number|null;geoPrecision?:'approximate'|'precise'|null;updateCoordinates?:boolean};
 
 export function locationTree(locations:SavedLocation[]){
   const byId=new Map(locations.map(l=>[l.id,l]));
@@ -24,11 +26,11 @@ export function locationTree(locations:SavedLocation[]){
 }
 
 type EditorProps={
-  locations:SavedLocation[];language:'no'|'en';initialParent?:string;
+  locations:SavedLocation[];language:'no'|'en';initialParent?:string;locationMode?:LocationMode;
   existing?:SavedLocation;onSave:(value:LocationInput,id?:string)=>Promise<void>;
   onCancel:()=>void;
 };
-export function LocationEditor({locations,language,initialParent='',existing,onSave,onCancel}:EditorProps){
+export function LocationEditor({locations,language,initialParent='',locationMode='ask',existing,onSave,onCancel}:EditorProps){
   const no=language==='no';
   const [name,setName]=useState(existing?.name||'');
   const [parentId,setParentId]=useState(existing?.parent_location_id||initialParent);
@@ -36,6 +38,10 @@ export function LocationEditor({locations,language,initialParent='',existing,onS
   const [address,setAddress]=useState(existing?.address||'');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const [geoBusy,setGeoBusy]=useState(false);
+  const [geoPrecision,setGeoPrecision]=useState<'approximate'|'precise'>(locationMode==='precise'?'precise':'approximate');
+  const [coordinates,setCoordinates]=useState<{latitude:number;longitude:number}|null>(existing?.latitude!=null&&existing?.longitude!=null?{latitude:existing.latitude,longitude:existing.longitude}:null);
+  const [coordinatesChanged,setCoordinatesChanged]=useState(false);
   const options=useMemo(()=>locationTree(locations).filter(entry=>{
     let current:SavedLocation|undefined=entry.location;
     const visited=new Set<string>();
@@ -49,7 +55,7 @@ export function LocationEditor({locations,language,initialParent='',existing,onS
   async function submit(){
     if(!name.trim()||busy)return;
     setBusy(true);setError('');
-    try{await onSave({name:name.trim(),parentId:parentId||null,address:parentId?null:address.trim()||null,icon:icon||null},existing?.id);}
+    try{await onSave({name:name.trim(),parentId:parentId||null,address:parentId?null:address.trim()||null,icon:icon||null,...(coordinatesChanged?{latitude:coordinates?.latitude??null,longitude:coordinates?.longitude??null,geoPrecision:coordinates?geoPrecision:null,updateCoordinates:true}:{})},existing?.id);}
     catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   }
@@ -61,6 +67,12 @@ export function LocationEditor({locations,language,initialParent='',existing,onS
       <label>{no?'Legg under':'Parent location'}<select value={parentId} onChange={e=>{setParentId(e.target.value);if(e.target.value)setAddress('');}}><option value="">{no?'Øverste nivå':'Top level'}</option>{options.map(({location,depth})=><option key={location.id} value={location.id}>{'　'.repeat(depth)}{location.name}</option>)}</select></label>
       {!parentId&&<label>{no?'Adresse (valgfritt)':'Address (optional)'}<input value={address} onChange={e=>setAddress(e.target.value)} placeholder={no?'Gateadresse for hjem, hytte osv.':'Street address for home, cabin, etc.'}/></label>}
     </div>
+    <div className="location-geo-controls"><span className="small muted">{no?'Geografisk posisjon for stedsforslag (valgfritt)':'Geographic position for suggestions (optional)'}</span>
+      {locationMode!=='off'&&<><select aria-label={no?'Nøyaktighet for lagret sted':'Saved place precision'} value={geoPrecision} onChange={e=>setGeoPrecision(e.target.value as 'precise'|'approximate')}><option value="approximate">{no?'Omtrentlig':'Approximate'}</option><option value="precise">{no?'Presis':'Precise'}</option></select>
+      <button type="button" className="secondary" disabled={geoBusy} onClick={async()=>{setGeoBusy(true);setError('');try{const pos=await getPositionOnce(geoPrecision);setCoordinates({latitude:pos.latitude,longitude:pos.longitude});setCoordinatesChanged(true);}catch{setError(no?'Kunne ikke hente posisjon. Sjekk tillatelsen i nettleseren.':'Could not get location. Check browser permissions.');}finally{setGeoBusy(false);}}}>{geoBusy?(no?'Henter posisjon …':'Locating …'):(no?'Bruk min posisjon for stedet':'Use my location for this place')}</button></>}
+      {coordinates&&<><small className="muted">{no?'Stedet har lagrede koordinater.':'This place has saved coordinates.'}</small><button type="button" className="text-button" onClick={()=>{setCoordinates(null);setCoordinatesChanged(true);}}>{no?'Fjern stedsposisjon':'Remove place coordinates'}</button></>}
+      {locationMode==='off'&&<small className="muted">{no?'Posisjon er deaktivert i Innstillinger.':'Location is disabled in Settings.'}</small>}
+    </div>
     {error&&<p role="alert" className="error">{error}</p>}
     <div className="location-editor-actions"><button type="button" className="secondary" onClick={onCancel}>{no?'Avbryt':'Cancel'}</button><button type="button" className="primary" onClick={()=>void submit()} disabled={busy||!name.trim()}><Check size={16}/>{busy?(no?'Lagrer…':'Saving…'):(no?'Lagre sted':'Save location')}</button></div>
   </div>;
@@ -69,12 +81,12 @@ export function LocationEditor({locations,language,initialParent='',existing,onS
 type BlockingEntry={id:string;name:string};
 type LocationBlockers={children:BlockingEntry[];items:BlockingEntry[];history:BlockingEntry[]};
 type ManagerProps={
-  locations:SavedLocation[];language:'no'|'en';
+  locations:SavedLocation[];language:'no'|'en';locationMode?:LocationMode;
   onMutate:(payload:Record<string,unknown>)=>Promise<unknown>;
   onChanged:()=>Promise<void>;
   onOpenMemory:(id:string)=>void;
 };
-export function LocationManager({locations,language,onMutate,onChanged,onOpenMemory}:ManagerProps){
+export function LocationManager({locations,language,locationMode='ask',onMutate,onChanged,onOpenMemory}:ManagerProps){
   const no=language==='no';
   const [editing,setEditing]=useState<{id?:string;parent?:string}|null>(null);
   const [menu,setMenu]=useState<string|null>(null);
@@ -103,7 +115,7 @@ export function LocationManager({locations,language,onMutate,onChanged,onOpenMem
   }
   return <div className="location-manager">
     <div className="location-manager-head"><div><h2>{no?'Administrer steder':'Manage locations'}</h2><p>{no?'Organiser steder i nivåer. Bruk + ved et sted for å legge til rom, skap og skuffer.':'Organize nested places. Use + beside a location to add rooms and drawers.'}</p></div><button className="secondary" onClick={()=>{setMenu(null);setEditing({});}}><Plus size={16}/>{no?'Nytt sted':'New place'}</button></div>
-    {editing&&<LocationEditor key={(editing.id||'new')+':'+(editing.parent||'')} locations={locations} language={language} initialParent={editing.parent} existing={locations.find(l=>l.id===editing.id)} onSave={save} onCancel={()=>setEditing(null)}/>}
+    {editing&&<LocationEditor key={(editing.id||'new')+':'+(editing.parent||'')} locations={locations} language={language} locationMode={locationMode} initialParent={editing.parent} existing={locations.find(l=>l.id===editing.id)} onSave={save} onCancel={()=>setEditing(null)}/>}
     {error&&<div className="location-delete-error" role="alert">
       <p className="error">{error}</p>
       {blocked&&<div className="location-blockers">
