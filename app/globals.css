@@ -69,3 +69,17 @@
 .location-blockers button{display:inline-flex;align-items:center;gap:7px;padding:9px 11px;font-size:13px;line-height:1.4;max-width:100%;text-align:left;white-space:normal}
 .location-blockers .muted{width:100%;font-size:12px;line-height:1.5;margin:6px 0 0}
 @media(max-width:760px){.location-blockers button{width:100%;justify-content:flex-start}}
+
+/* Local photo preview; reuse existing cream/sage palette. */
+.photo-picker{display:grid;gap:12px;min-width:0}
+.photo-preview{overflow:hidden;border:1px solid #e1e7da;border-radius:14px;background:#f7f8f4}
+.photo-preview img{display:block;width:100%;height:auto;max-height:225px;object-fit:contain;background:#f0f3eb}
+.photo-preview-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;color:#536a53;font-size:13px}
+.photo-preview-meta button{display:inline-flex;align-items:center;gap:6px;color:#ab4545;padding:6px 3px}
+.photo-actions{display:flex;flex-wrap:wrap;gap:10px}
+.photo-picker-action{display:inline-flex;position:relative;align-items:center;justify-content:center;gap:8px;padding:10px 12px;border:1px solid #dfe5da;border-radius:10px;background:#fff;color:#5e8f72;font-size:13px;line-height:1.4;cursor:pointer}
+.photo-picker-action:hover{background:#e4efe8}
+.photo-picker-action:focus-within{outline:2px solid #5e8f72;outline-offset:2px}
+.photo-picker-action input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important}
+.photo-picker>.error{margin:0;font-size:13px}
+@media(max-width:760px){.photo-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.photo-picker-action{min-width:0;padding:12px 8px;text-align:center;font-size:12px}.photo-preview img{max-height:200px}}

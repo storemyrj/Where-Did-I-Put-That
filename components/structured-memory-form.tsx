@@ -1,16 +1,17 @@
 'use client';
 
 import {FormEvent,useMemo,useState} from 'react';
-import {Camera,ChevronDown,Plus} from 'lucide-react';
+import {ChevronDown,Plus} from 'lucide-react';
+import {PhotoPicker} from '@/components/photo-picker';
 import {emoji} from '@/lib/memory';
 import {LocationIcon} from '@/components/location-icon';
 import {LocationEditor,locationTree,type LocationInput,type SavedLocation} from '@/components/location-manager';
 
 const itemIcons=['🔑','🎧','📕','🔌','📱','👓','👛','⌚','📷','💊','🧰','🧳','🚲','🪪','📦','🧥','🎒','👜','👖','💻','📚','🔦'];
 type Draft={name:string;location:string[];description:string;icon:string;latitude?:number;longitude?:number;locationPrecision?:'precise'|'approximate';clearLocationPin?:boolean};
-type Props={locations:SavedLocation[];recentLocations:string[][];language:'no'|'en';initial?:{name:string;location:string[];description?:string;icon?:string;saved_latitude?:number;saved_longitude?:number};onCreate:(draft:Draft)=>void;onPhoto:(file:File|null)=>void;onCreateLocation:(value:LocationInput)=>Promise<string>};
+type Props={locations:SavedLocation[];recentLocations:string[][];language:'no'|'en';initial?:{name:string;location:string[];description?:string;icon?:string;saved_latitude?:number;saved_longitude?:number};onCreate:(draft:Draft)=>void;photo:File|null;onPhoto:(file:File|null)=>void;onCreateLocation:(value:LocationInput)=>Promise<string>};
 
-export function StructuredMemoryForm({locations,recentLocations,language,onCreate,onPhoto,onCreateLocation,initial}:Props){
+export function StructuredMemoryForm({locations,recentLocations,language,onCreate,photo,onPhoto,onCreateLocation,initial}:Props){
   const no=language==='no';
   const [name,setName]=useState(initial?.name||'');
   const [note,setNote]=useState(initial?.description||'');
@@ -64,7 +65,7 @@ export function StructuredMemoryForm({locations,recentLocations,language,onCreat
     {hasExistingPin&&<label className="save-location"><input type="checkbox" checked={keepExistingPin} onChange={e=>setKeepExistingPin(e.target.checked)}/><span>{no?'Behold eksisterende kartpin':'Keep existing map pin'}</span></label>}
     {saveCurrentLocation&&<label>{no?'Nøyaktighet':'Location accuracy'}<select value={precision} onChange={e=>setPrecision(e.target.value as 'precise'|'approximate')}><option value="approximate">{no?'Omtrentlig (ca. 1 km)':'Approximate (about 1 km)'}</option><option value="precise">{no?'Presis posisjon':'Precise location'}</option></select></label>}
     {locationStatus&&<p className="small muted" role="status">{locationStatus}</p>}
-    <label className="attach"><Camera size={18}/>{no?'Ta eller velg bilde':'Take or choose photo'}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={e=>onPhoto(e.target.files?.[0]??null)}/></label>
+    <PhotoPicker file={photo} onChange={onPhoto} language={language}/>
     <button className="primary full" disabled={!name.trim()||busy}><Plus size={17}/>{busy?(no?'Henter posisjon …':'Getting location …'):(initial?(no?'Lagre endringer':'Save changes'):(no?'Opprett minne':'Create memory'))}</button>
   </form>;
 }

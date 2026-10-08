@@ -9,26 +9,5 @@ const locationText=match[2].replace(/^(?:the|my|den|det|en|et|min|mitt|mine)\s+/
 const parts=locationText.split(/\s+(?:in|inside|on|i|inni|på)\s+(?:the\s+|my\s+|den\s+|det\s+)?/i).reverse();
 if(parts.length===1){const room=locationText.match(/^(bedroom|kitchen|living room|bathroom|hallway|office|garage|basement|attic|soverom|kjøkken|stue|bad|gang|kontor|garasje|kjeller|loft)\s+(.+)$/i);if(room)parts.splice(0,1,room[1],room[2]);}
 return {name,location:parts.map(title),temporaryUntil};}
-export function searchMemories(items:Memory[],query:string){let q=query.toLowerCase().replace(/[?.,’']/g,' ').replace(/\b(where|did|do|i|put|leave|left|are|is|s|my|the|find|please|a|an|hvor|la|jeg|min|mitt|mine|er|ligger|finn|på)\b/g,' ').trim();const norm=(s:string)=>s.toLowerCase().replace(/earbuds|headphones/g,'airpods').replace(/chargers/g,'charger').replace(/keys|nøkler/g,'key').replace(/\s+/g,' ').trim();q=norm(q);if(!q)return [];return items.filter(i=>{const n=norm(i.name);return n.includes(q)||q.includes(n)||q.split(' ').every(w=>n.includes(w));});}
-export function emoji(name:string){
- const n=name.toLocaleLowerCase('nb-NO');
- if(/key|nøkl|nøkkel|nøkkelknipe/.test(n))return '🔑';
- if(/passport|pass\b|document|dokument|identitetskort|id-kort/.test(n))return '📕';
- if(/airpod|earbud|headphone|ørepropp|hodetelefon/.test(n))return '🎧';
- if(/charger|cable|lader|ladekabel|ledning/.test(n))return '🔌';
- if(/phone|telefon|mobil/.test(n))return '📱';
- if(/glasses|glass|brille/.test(n))return '👓';
- if(/wallet|lommebok|pengepung/.test(n))return '👛';
- if(/watch|klokke/.test(n))return '⌚';
- if(/camera|kamera/.test(n))return '📷';
- if(/jakk|coat|jacket|hoodie|genser|jakke/.test(n))return '🧥';
- if(/ryggsekk|backpack|sekk/.test(n))return '🎒';
- if(/bag|veske|handbag/.test(n))return '👜';
- if(/lomme|pocket/.test(n))return '👖';
- if(/laptop|datamaskin|computer|pc\b/.test(n))return '💻';
- if(/medicine|medisin|tablett/.test(n))return '💊';
- if(/book|bok\b|bøker/.test(n))return '📚';
- if(/flashlight|lommelykt/.test(n))return '🔦';
- return '📦';
-}
+export {searchMemories,emoji} from './item-recognition';
 export const examples:Memory[]=[{id:'demo-1',name:'Keys',location:['Kitchen','Drawer'],updated_at:new Date().toISOString(),history:[]},{id:'demo-2',name:'AirPods',location:['Bedroom','Desk'],updated_at:new Date(Date.now()-3600000).toISOString(),history:[]},{id:'demo-3',name:'Passport',location:['Bedroom','Top drawer'],updated_at:new Date(Date.now()-86400000).toISOString(),history:[]},{id:'demo-4',name:'Charger',location:['Living room','TV cabinet'],updated_at:new Date(Date.now()-172800000).toISOString(),history:[]}];
