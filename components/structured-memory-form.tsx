@@ -6,7 +6,7 @@ import {emoji} from '@/lib/memory';
 import {LocationIcon} from '@/components/location-icon';
 import {LocationEditor,locationTree,type LocationInput,type SavedLocation} from '@/components/location-manager';
 
-const itemIcons=['🔑','🎧','📕','🔌','📱','👓','👛','⌚','📷','💊','🧰','🧳','🚲','🪪','📦'];
+const itemIcons=['🔑','🎧','📕','🔌','📱','👓','👛','⌚','📷','💊','🧰','🧳','🚲','🪪','📦','🧥','🎒','👜','👖','💻','📚','🔦'];
 type Draft={name:string;location:string[];description:string;icon:string;latitude?:number;longitude?:number;locationPrecision?:'precise'|'approximate';clearLocationPin?:boolean};
 type Props={locations:SavedLocation[];recentLocations:string[][];language:'no'|'en';initial?:{name:string;location:string[];description?:string;icon?:string;saved_latitude?:number;saved_longitude?:number};onCreate:(draft:Draft)=>void;onPhoto:(file:File|null)=>void;onCreateLocation:(value:LocationInput)=>Promise<string>};
 

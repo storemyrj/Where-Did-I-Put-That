@@ -57,7 +57,7 @@ export function LocationEditor({locations,language,initialParent='',existing,onS
     <div className="location-editor-heading"><strong>{existing?(no?'Rediger sted':'Edit location'):(no?'Nytt sted':'New location')}</strong><button type="button" className="icon-button" onClick={onCancel} aria-label={no?'Lukk':'Close'}><X size={17}/></button></div>
     <div className="location-editor-fields">
       <label>{no?'Navn':'Name'}<input value={name} onChange={e=>setName(e.target.value)} placeholder={no?'F.eks. Soverom':'E.g. Bedroom'} autoFocus maxLength={100} required/></label>
-      <label>{no?'Ikon':'Icon'}<select value={icon} onChange={e=>setIcon(e.target.value)}><option value="">{no?'Automatisk':'Automatic'} ({suggestedLocationIcon(name)})</option>{locationIconChoices.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+      <label>{no?'Ikon':'Icon'}<select value={icon} onChange={e=>setIcon(e.target.value)}><option value="">{no?'Automatisk':'Automatic'} ({locationIconChoices.find(([value])=>value===suggestedLocationIcon(name))?.[1]||'Place'})</option>{locationIconChoices.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
       <label>{no?'Legg under':'Parent location'}<select value={parentId} onChange={e=>{setParentId(e.target.value);if(e.target.value)setAddress('');}}><option value="">{no?'Øverste nivå':'Top level'}</option>{options.map(({location,depth})=><option key={location.id} value={location.id}>{'　'.repeat(depth)}{location.name}</option>)}</select></label>
       {!parentId&&<label>{no?'Adresse (valgfritt)':'Address (optional)'}<input value={address} onChange={e=>setAddress(e.target.value)} placeholder={no?'Gateadresse for hjem, hytte osv.':'Street address for home, cabin, etc.'}/></label>}
     </div>
@@ -66,30 +66,59 @@ export function LocationEditor({locations,language,initialParent='',existing,onS
   </div>;
 }
 
+type BlockingEntry={id:string;name:string};
+type LocationBlockers={children:BlockingEntry[];items:BlockingEntry[];history:BlockingEntry[]};
 type ManagerProps={
   locations:SavedLocation[];language:'no'|'en';
   onMutate:(payload:Record<string,unknown>)=>Promise<unknown>;
   onChanged:()=>Promise<void>;
+  onOpenMemory:(id:string)=>void;
 };
-export function LocationManager({locations,language,onMutate,onChanged}:ManagerProps){
+export function LocationManager({locations,language,onMutate,onChanged,onOpenMemory}:ManagerProps){
   const no=language==='no';
   const [editing,setEditing]=useState<{id?:string;parent?:string}|null>(null);
   const [menu,setMenu]=useState<string|null>(null);
   const [error,setError]=useState('');
+  const [blocked,setBlocked]=useState<LocationBlockers|null>(null);
   const rows=useMemo(()=>locationTree(locations),[locations]);
   async function save(value:LocationInput,id?:string){
     await onMutate({action:id?'location_update':'location_create',...(id?{id}:{}),...value});
-    await onChanged();setEditing(null);setMenu(null);
+    await onChanged();setEditing(null);setMenu(null);setBlocked(null);setError('');
   }
   async function remove(location:SavedLocation){
     if(!window.confirm(no?`Slette «${location.name}»? Steder med undernivåer eller minner kan ikke slettes.`:`Delete “${location.name}”? Locations with children or memories cannot be deleted.`))return;
-    try{setError('');await onMutate({action:'location_delete',id:location.id});await onChanged();setMenu(null);}
-    catch(e){setError(e instanceof Error?e.message:String(e));}
+    try{
+      setError('');setBlocked(null);
+      await onMutate({action:'location_delete',id:location.id});
+      await onChanged();setMenu(null);
+    }catch(e){
+      const failure=e as Error&{code?:string;blockers?:LocationBlockers};
+      if(failure.code==='LOCATION_IN_USE'&&failure.blockers){
+        setBlocked(failure.blockers);
+        setError(no?`«${location.name}» kan ikke slettes før tilknyttede steder og minner er håndtert.`:`“${location.name}” cannot be deleted until its linked places and memories are handled.`);
+      }else{
+        setError(failure.message||String(e));
+      }
+    }
   }
   return <div className="location-manager">
     <div className="location-manager-head"><div><h2>{no?'Administrer steder':'Manage locations'}</h2><p>{no?'Organiser steder i nivåer. Bruk + ved et sted for å legge til rom, skap og skuffer.':'Organize nested places. Use + beside a location to add rooms and drawers.'}</p></div><button className="secondary" onClick={()=>{setMenu(null);setEditing({});}}><Plus size={16}/>{no?'Nytt sted':'New place'}</button></div>
     {editing&&<LocationEditor key={(editing.id||'new')+':'+(editing.parent||'')} locations={locations} language={language} initialParent={editing.parent} existing={locations.find(l=>l.id===editing.id)} onSave={save} onCancel={()=>setEditing(null)}/>}
-    {error&&<p role="alert" className="error">{error}</p>}
+    {error&&<div className="location-delete-error" role="alert">
+      <p className="error">{error}</p>
+      {blocked&&<div className="location-blockers">
+        {blocked.children.map(child=><button type="button" key={'child-'+child.id} className="secondary" onClick={()=>{setEditing({id:child.id});setMenu(null);setBlocked(null);setError('');}}>
+          <LocationIcon name={child.name} size={15}/>{no?'Rediger understed:':'Edit sublocation:'} {child.name}
+        </button>)}
+        {blocked.items.map(item=><button type="button" key={'item-'+item.id} className="secondary" onClick={()=>onOpenMemory(item.id)}>
+          {no?'Åpne minne:':'Open memory:'} {item.name}
+        </button>)}
+        {blocked.history.filter(item=>!blocked.items.some(current=>current.id===item.id)).map(item=><button type="button" key={'history-'+item.id} className="secondary" onClick={()=>onOpenMemory(item.id)}>
+          {no?'Åpne historikk for:':'Open history for:'} {item.name}
+        </button>)}
+        {blocked.history.length>0&&<p className="small muted">{no?'Steder brukt i historikken kan ikke slettes bare ved å flytte minnet. Den historiske koblingen bevares til det tilknyttede minnet slettes.':'Moving a memory does not erase its location history. Historical links remain until the associated memory is deleted.'}</p>}
+      </div>}
+    </div>}
     <div className="location-hierarchy">{rows.length?rows.map(({location,depth})=><div className="location-node" key={location.id}>
       <div className="location-node-content" style={{paddingLeft:12+depth*23}}><LocationIcon icon={location.icon} name={location.name} size={19}/><div className="location-node-name"><strong>{location.name}</strong>{location.address&&<a href={'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(location.address)} target="_blank" rel="noreferrer">{location.address} ↗</a>}</div></div>
       <button className="icon-button" onClick={()=>{setMenu(null);setEditing({parent:location.id});}} title={no?'Legg til undernivå':'Add sublocation'} aria-label={(no?'Legg til under ':'Add child to ')+location.name}><Plus size={17}/></button>

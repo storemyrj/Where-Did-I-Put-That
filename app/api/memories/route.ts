@@ -75,10 +75,14 @@ export async function POST(req:Request){
       if(typeof p.id!=='string')return json({error:'Location not found.'},400);
       const found=await db.prepare('SELECT id FROM locations WHERE id=? AND user_id=?').bind(p.id,u.userId).first();
       if(!found)return json({error:'Location not found.'},404);
-      const children=await db.prepare('SELECT id FROM locations WHERE parent_location_id=? AND user_id=? LIMIT 1').bind(p.id,u.userId).first();
-      const used=await db.prepare('SELECT id FROM items WHERE current_location_id=? AND user_id=? LIMIT 1').bind(p.id,u.userId).first();
-      const history=await db.prepare('SELECT h.id FROM location_history h JOIN items i ON i.id=h.item_id WHERE h.location_id=? AND i.user_id=? LIMIT 1').bind(p.id,u.userId).first();
-      if(children||used||history)return json({error:'This location has child locations or saved memories. Move them before deleting it.'},409);
+      const [children,used,history]=await Promise.all([
+        db.prepare('SELECT id,name FROM locations WHERE parent_location_id=? AND user_id=? ORDER BY name LIMIT 30').bind(p.id,u.userId).all<{id:string;name:string}>(),
+        db.prepare('SELECT id,name FROM items WHERE current_location_id=? AND user_id=? ORDER BY name LIMIT 30').bind(p.id,u.userId).all<{id:string;name:string}>(),
+        db.prepare('SELECT DISTINCT i.id,i.name FROM location_history h JOIN items i ON i.id=h.item_id WHERE h.location_id=? AND i.user_id=? ORDER BY i.name LIMIT 30').bind(p.id,u.userId).all<{id:string;name:string}>(),
+      ]);
+      if(children.results.length||used.results.length||history.results.length){
+        return json({code:'LOCATION_IN_USE',error:'Location still has connected places or memories.',blockers:{children:children.results,items:used.results,history:history.results}},409);
+      }
       await db.prepare('DELETE FROM locations WHERE id=? AND user_id=?').bind(p.id,u.userId).run();
       return json({ok:true});
     }

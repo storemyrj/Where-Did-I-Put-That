@@ -61,3 +61,11 @@
 .memory-dialog{max-height:calc(100dvh - 38px);overflow-y:auto}
 .structured-memory-form .location-picker .location-editor{width:100%}
 .structured-memory-form .location-picker .location-editor-fields{grid-template-columns:1fr}
+
+/* Actionable location deletion feedback in existing sage/cream design. */
+.location-delete-error{margin:12px 0 16px;padding:13px;border:1px solid #e5e9e1;border-radius:12px;background:#f7f8f4}
+.location-delete-error>.error{margin:0 0 10px}
+.location-blockers{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.location-blockers button{display:inline-flex;align-items:center;gap:7px;padding:9px 11px;font-size:13px;line-height:1.4;max-width:100%;text-align:left;white-space:normal}
+.location-blockers .muted{width:100%;font-size:12px;line-height:1.5;margin:6px 0 0}
+@media(max-width:760px){.location-blockers button{width:100%;justify-content:flex-start}}
