@@ -25,6 +25,17 @@ Phase 3 and 4 have received a user-approved follow-up refinement. This document 
 - The desktop home still uses the original layout with introductory text, search panel, and recent memories. Phase 5 will change desktop independently.
 - Responsive sizing keeps both cards visually equal, and test widths include 320 × 568 and 390 × 844.
 
+### iPhone voice-focus regression (October 2026)
+
+On iOS, opening a modal and programmatically focusing a text input can open the keyboard and terminate an active `SpeechRecognition` session. The search dialog previously combined the browser `autoFocus` attribute with Radix's default FocusScope autofocus.
+
+- A home microphone click synchronously opens the corresponding dialog **and** calls `SpeechRecognition.start()` in the same user gesture.
+- `onOpenAutoFocus` prevents Radix from focusing the input **only for a voice-launched dialog** and focuses the dialog container instead. The input no longer declares `autoFocus`.
+- For a regular search-card click (without microphone), the Radix focus behavior still focuses the search input and supports immediate typing.
+- If someone starts speech from an already-focused input, the input is blurred before starting the recognition session.
+- Do not defer `SpeechRecognition.start()` with a timer or mount effect; Safari may require an immediate user gesture.
+- A mobile-width browser regression test using a mock recognizer that cancels on input focus covered: search microphone launch, regular search typing, microphone in the search dialog, remember microphone launch, and regular remember opening (16 assertions passed). The mock cannot prove actual iOS Safari microphone behavior; validate on a physical iPhone after deployment.
+
 ## Validation and deployment
 
 The release must pass `pnpm run test:suggestions`, `pnpm run test:recognition`, `pnpm exec tsc --noEmit`, targeted ESLint, `pnpm run build` and browser smoke checks of mobile/desktop layouts, text, microphone startup, item/location suggestions, manual correction, pictures, confirmation and actual save. The existing `no-explicit-any` lint debt remains out of scope.
