@@ -378,3 +378,75 @@
 @media(prefers-reduced-motion:reduce){
   .page-home .home-action-card{transition:none;transform:none!important}
 }
+
+/* Rotating typewriter headline replaces the former static mobile/desktop title. */
+.page-home .typewriter-heading{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;height:144px;min-height:144px;max-height:144px;
+}
+.page-home .typewriter-title{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  max-width:100%;min-width:0;margin:0;
+  font-weight:580;line-height:1.17;letter-spacing:-1.25px;
+  text-wrap:balance;overflow-wrap:anywhere;
+}
+.page-home .typewriter-icon{
+  width:1em;height:1em;min-width:1em;min-height:1em;
+  stroke:#5e8f72;align-self:center;flex-shrink:0;
+}
+.page-home .typewriter-letters{min-width:0}
+.typewriter-caret{
+  display:inline-block;vertical-align:-.1em;width:2px;height:.85em;
+  margin-left:3px;border-radius:2px;background:#5e8f72;
+  animation:wdipt-caret-blink 1s steps(1,end) infinite;
+}
+@keyframes wdipt-caret-blink{50%{opacity:0}}
+@media(min-width:761px){
+  .page-home>.mobile-home-actions .typewriter-heading{
+    grid-column:1/-1;justify-content:flex-start;
+    height:158px;min-height:158px;max-height:158px;
+  }
+  .page-home>.mobile-home-actions .typewriter-title{
+    font-size:clamp(35px,3.1vw,46px);
+    text-align:left;justify-content:flex-start;
+    letter-spacing:-1.75px;line-height:1.17;
+  }
+  .page-home>.mobile-home-actions{row-gap:14px}
+}
+@media(min-width:761px) and (max-width:1050px){
+  .page-home>.mobile-home-actions .typewriter-heading{
+    height:151px;min-height:151px;max-height:151px;
+  }
+  .page-home>.mobile-home-actions .typewriter-title{
+    font-size:clamp(29px,3.4vw,37px);letter-spacing:-1.1px;
+  }
+}
+@media(max-width:760px){
+  .page-home>.mobile-home-actions .typewriter-heading{
+    height:135px;min-height:135px;max-height:135px;
+    padding:0 2px;
+  }
+  .page-home>.mobile-home-actions .typewriter-title{
+    font-size:clamp(22px,6.6vw,33px);
+    letter-spacing:-.95px;text-align:center;
+    line-height:1.16;gap:9px;
+  }
+  .page-home>.mobile-home-actions .typewriter-icon{width:.95em;min-width:.95em}
+}
+@media(max-width:760px) and (max-height:650px){
+  main.page-home{padding-top:9px}
+  .page-home>.mobile-home-actions .typewriter-heading{
+    height:77px;min-height:77px;max-height:77px;
+  }
+  .page-home>.mobile-home-actions .typewriter-title{
+    font-size:clamp(20px,5.9vw,25px);line-height:1.12;
+    gap:7px;letter-spacing:-.6px;
+  }
+  .page-home .mobile-home-actions{gap:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .typewriter-caret{animation:none!important}
+}
+
+/* The desktop sidebar already provides Home / Memory Bank / Settings. Remove redundant top-left breadcrumb. */
+.topbar-right{margin-left:auto}
