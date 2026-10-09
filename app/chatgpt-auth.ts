@@ -1,11 +1,14 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import {googleMode,googleSessionUser} from '@/lib/google-auth-server';
 
 export type ChatGPTUser = {
   userId: string;
   displayName: string;
   email: string;
   fullName: string | null;
+  givenName: string | null;
+  picture: string | null;
 };
 
 const USER_ID_HEADER = "oai-authenticated-user-id";
@@ -22,6 +25,9 @@ const CALLBACK_PATH = "/callback";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
+  // When Google auth is enabled, NEVER fall back to Cloudflare/ChatGPT
+  // identity headers. This makes an app-level logout actually end access.
+  if(googleMode())return googleSessionUser(requestHeaders.get('cookie'));
   const userId = requestHeaders.get(USER_ID_HEADER);
   const email = requestHeaders.get(USER_EMAIL_HEADER);
   const cfEmail = requestHeaders.get(CF_ACCESS_EMAIL_HEADER);
@@ -35,6 +41,8 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
       displayName: cfName ?? cfEmail,
       email: cfEmail,
       fullName: cfName,
+      givenName: null,
+      picture: null,
     };
   }
   if (!userId || !email) return null;
@@ -51,6 +59,8 @@ export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
     displayName: fullName ?? email,
     email,
     fullName,
+    givenName: null,
+    picture: null,
   };
 }
 

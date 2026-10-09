@@ -548,3 +548,45 @@
 @media(prefers-reduced-motion:reduce){
   .desktop-nav button{transition:none}
 }
+
+/* Google account avatar; fall back to the existing initial when unavailable. */
+.topbar .avatar{overflow:hidden;padding:0}
+.topbar .avatar img{display:block;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.profile-menu form{margin:0;display:block}
+.profile-menu form button{width:100%;text-align:left}
+
+/* Independent Google login screen, preserving the main app's sage/cream palette. */
+.login-screen{max-width:none;min-height:100dvh;padding:0;margin:0;display:flex;flex-direction:column;background:#f7f6f2;color:#1d211f}
+.login-header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:25px clamp(22px,4vw,65px);border-bottom:1px solid #e5e5e0}
+.login-brand{display:flex;align-items:center;gap:12px;font-size:19px;line-height:1.16;letter-spacing:-.5px}
+.login-brand-icon{position:relative;width:45px;height:45px;color:#5e8f72;display:grid;place-items:center}
+.login-brand-icon svg:last-child{position:absolute;top:0;right:0;background:#f7f6f2;color:#1d211f;width:18px;height:18px}
+.login-language{font-size:12px;color:#777c78;letter-spacing:.2px}
+.login-center{width:min(100% - 36px,610px);margin:auto;display:flex;align-items:center;flex-direction:column;text-align:center;padding:65px 18px 95px;gap:24px}
+.login-illustration{display:flex;align-items:center;justify-content:center;gap:20px;color:#5e8f72}
+.login-illustration span{width:67px;height:67px;display:grid;place-items:center;border:1px solid #dae8dd;border-radius:22px;background:#e4efe8}
+.login-illustration span:nth-child(2){width:88px;height:88px;background:#fff;border-color:#dde5d9;border-radius:28px;box-shadow:0 6px 18px #343d2610}
+.login-center h1{font-size:clamp(32px,4vw,51px);max-width:580px;line-height:1.1;font-weight:600;letter-spacing:-1.6px}
+.login-center>p{max-width:450px;font-size:16px;line-height:1.65;color:#777c78}
+.login-google-button{display:flex;align-items:center;justify-content:center;gap:14px;min-height:59px;width:min(100%,360px);margin-top:12px;border-radius:15px;border:1px solid #d6ded4;background:#fff;color:#1d211f;font-weight:600;font-size:15px;box-shadow:0 4px 14px #2b473016;transition:background .2s,transform .2s}
+.login-google-button:not(.disabled):hover{background:#f0f5ef;transform:translateY(-1px)}
+.login-google-button.disabled{opacity:.6;cursor:not-allowed}
+.login-google-symbol{font-size:22px;font-weight:700;color:#4285f4}
+.login-google-button>svg{color:#5e8f72}
+.login-privacy{display:flex;align-items:center;justify-content:center;gap:10px;color:#777c78;font-size:12px;line-height:1.5;text-align:center}
+.login-privacy svg{color:#5e8f72}
+.login-error{max-width:100%;padding:12px 16px;border-radius:12px;background:#f8eeee;color:#83413a;font-size:13px;line-height:1.5}
+@media(max-width:760px){
+ .login-header{padding:20px 24px}
+ .login-language{display:none}
+ .login-brand{font-size:17px}
+ .login-center{width:min(100% - 28px,520px);gap:21px;padding:45px 15px 90px}
+ .login-center h1{font-size:clamp(30px,8vw,39px);letter-spacing:-1px}
+ .login-center>p{font-size:14px}
+ .login-illustration{gap:10px}
+ .login-illustration span{width:55px;height:55px;border-radius:17px}
+ .login-illustration span:nth-child(2){width:72px;height:72px;border-radius:21px}
+}
+@media(prefers-reduced-motion:reduce){
+ .login-google-button{transition:none;transform:none!important}
+}

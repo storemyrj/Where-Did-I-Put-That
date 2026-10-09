@@ -1,8 +1,9 @@
 import { getChatGPTUser } from '../../chatgpt-auth';
+import {googleMode} from '@/lib/google-auth-server';
 import { database, bucket } from '@/lib/storage';
 import {isLocationMode,isSpeechLanguage,DEFAULT_PREFERENCES} from '@/lib/preferences';
 
-const json=(body:unknown,status=200)=>Response.json(body,{status});
+const json=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 
 export async function GET(){
   const u=await getChatGPTUser();
@@ -15,7 +16,7 @@ export async function GET(){
       db.prepare('SELECT h.* FROM location_history h JOIN items i ON i.id=h.item_id WHERE i.user_id=? ORDER BY timestamp DESC').bind(u.userId).all(),
       db.prepare('SELECT * FROM users WHERE id=?').bind(u.userId).first(),
     ]);
-    return json({items:items.results,locations:locations.results,history:history.results,user:{name:u.fullName,email:u.email},notifications:profile?.notifications??'off',preferences:{locationMode:profile?.location_mode??DEFAULT_PREFERENCES.locationMode,microphoneEnabled:profile?.microphone_enabled!=='off',speechLanguage:profile?.speech_language??DEFAULT_PREFERENCES.speechLanguage}});
+    return json({items:items.results,locations:locations.results,history:history.results,user:{name:u.fullName,email:u.email,givenName:u.givenName,picture:u.picture},authProvider:googleMode()?'google':'cloudflare',notifications:profile?.notifications??'off',preferences:{locationMode:profile?.location_mode??DEFAULT_PREFERENCES.locationMode,microphoneEnabled:profile?.microphone_enabled!=='off',speechLanguage:profile?.speech_language??DEFAULT_PREFERENCES.speechLanguage}});
   }catch(e){console.error(e);return json({error:'Your memories are unavailable right now. Please try again.'},503);}
 }
 
@@ -109,7 +110,13 @@ export async function POST(req:Request){
       const selected=(await db.prepare('SELECT id,photo FROM items WHERE user_id=?').bind(u.userId).all()).results.filter((i:any)=>p.action!=='delete'||i.id===p.id);
       const batch=selected.flatMap((i:any)=>[db.prepare('DELETE FROM location_history WHERE item_id=?').bind(i.id),db.prepare('DELETE FROM items WHERE id=? AND user_id=?').bind(i.id,u.userId)]);
       if(p.action!=='delete')batch.push(db.prepare('DELETE FROM locations WHERE user_id=?').bind(u.userId));
-      if(p.action==='account')batch.push(db.prepare('DELETE FROM users WHERE id=?').bind(u.userId));
+      if(p.action==='account'){
+        batch.push(db.prepare('DELETE FROM users WHERE id=?').bind(u.userId));
+        if(googleMode()){
+          batch.push(db.prepare('DELETE FROM auth_sessions WHERE google_sub IN (SELECT google_sub FROM google_identities WHERE user_id=?)').bind(u.userId));
+          batch.push(db.prepare('DELETE FROM google_identities WHERE user_id=?').bind(u.userId));
+        }
+      }
       if(batch.length)await db.batch(batch);
       for(const i of selected)if(i.photo)await bucket().delete(String(i.photo));
       return json({ok:true});
