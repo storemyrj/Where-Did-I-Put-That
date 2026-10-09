@@ -1,4 +1,4 @@
-# Rotating typewriter home heading
+# One-time typewriter heading on Home entry
 
 ## Design and scope
 
@@ -25,28 +25,33 @@ The mobile header and three-tab bottom navigation remain unchanged.
   per account. They are not sent to any new service or synchronized between
   devices. They are cleared on memory/account bulk removal, or individually
   when the underlying item is deleted.
-- A localStorage shuffle bag is preserved across reloads and page visits.
-  Each eligible headline is used once per shuffled cycle; a completed
-  cycle explicitly avoids repeating the immediately previous headline.
-  On each page reload, a new sentence is chosen without showing the
-  previous hard-coded heading while loading.
-- Greetings are filtered by the local clock. When the language changes,
-  the currently selected headline is translated without consuming an
-  additional shuffle-bag entry. Going to Memory Bank / Settings and
-  returning to Home continues the current headline without a reset.
+- A localStorage shuffle bag is preserved across reloads and visits to Home.
+  One new eligible headline is drawn when the page loads or the user
+  navigates back to Home from Memory Bank / Settings. Each eligible headline
+  is used once per shuffled cycle, without immediate repetition.
+  Simply opening a search dialog, recording, or returning from a modal
+  **does not** count as a new Home visit.
+- Greetings are filtered by the local clock. Language switching translates
+  the current headline without consuming another shuffle-bag entry.
+  Navigating away to Memory Bank or Settings and then back to Home
+  **does** select and type a new headline.
 
 ## Motion and accessibility
 
-- Typing: 55 ms per Unicode code point. Full phrase hold: four seconds.
-  Deletion: 25 ms per code point. A small blinking caret accompanies typing.
+- Typing: 55 ms per Unicode code point, **once per Home visit**.
+  After the final character, the headline stays fully visible indefinitely;
+  it is never deleted, replaced by a timer, or retyped automatically.
+  The blinking caret is only present during the initial typing.
 - The animated area has a reserved fixed height; the primary action cards
   retain equal height and do not jump between phrases.
-- Motion pauses while the app is off Home, while searching / recording /
-  showing a modal, and while the page is in the background.
+- Unfinished typing pauses while the app is off Home, during searching /
+  recording / a modal, or while the page is in the background. Only navigating
+  away from Home and back starts a new heading.
 - The accessible heading exposes the full phrase to screen readers,
   rather than announcing partial characters. The Lucide icon is decorative.
-- With `prefers-reduced-motion: reduce`, the full phrase appears
-  immediately without typing, deleting or blinking, and rotates less often.
+- With `prefers-reduced-motion: reduce`, the full phrase appears immediately
+  without typing, deleting or blinking. A new phrase only appears on the next
+  Home visit or reload, just like the standard motion setting.
 
 ## Files
 
@@ -73,7 +78,8 @@ pnpm run build
 ```
 
 Check the built app at 320, 390, 761, 930, 1051 and 1440 px, including
-new headline on each reload, translation, reduced motion, the profile menu,
+new headline on each reload and Home navigation, no timed rotation after
+completion, translation, reduced motion, the profile menu,
 desktop sidebar, lack of duplicate breadcrumb, search and voice, and stable
 card positioning. After the user commits and pushes, verify the deployed
 iPhone and desktop app; browser-mocked microphone checks do not prove

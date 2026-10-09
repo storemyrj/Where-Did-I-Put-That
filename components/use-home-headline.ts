@@ -13,17 +13,19 @@ type Args={
   recentItems:readonly string[];
   ready:boolean;
   active:boolean;
+  isHome:boolean;
 };
 
-export function useHomeHeadline({language,name,email,recentItems,ready,active}:Args){
+export function useHomeHeadline({language,name,email,recentItems,ready,active,isHome}:Args){
   const [hour,setHour]=useState(()=>new Date().getHours());
   const [visible,setVisible]=useState(true);
   const [reducedMotion,setReducedMotion]=useState(false);
   const [headline,setHeadline]=useState<Headline|null>(null);
   const [count,setCount]=useState(0);
-  const [phase,setPhase]=useState<'typing'|'hold'|'deleting'>('typing');
+  const [finished,setFinished]=useState(false);
   const initializedKey=useRef<string|null>(null);
   const deckRef=useRef<HeadlineDeck|null>(null);
+  const wasHomeRef=useRef(isHome);
   const pool=useMemo(()=>buildHeadlinePool({hour,name,recentItems}),[hour,name,recentItems]);
   const key=HEADLINE_DECK_KEY+(email?'-'+localSearchStorageKey(email).split('-').pop():'-guest');
 
@@ -33,7 +35,7 @@ export function useHomeHeadline({language,name,email,recentItems,ready,active}:A
     try{window.localStorage.setItem(key,JSON.stringify(next.deck));}catch{/* private browsing */}
     setHeadline(next.headline);
     setCount(0);
-    setPhase('typing');
+    setFinished(false);
   },[pool,key]);
 
   // Read a single durable shuffle bag per account. React StrictMode must not
@@ -45,6 +47,14 @@ export function useHomeHeadline({language,name,email,recentItems,ready,active}:A
     catch{deckRef.current=null;}
     void Promise.resolve().then(advance);
   },[advance,key,ready]);
+
+  // A new visit to Home draws once; opening/closing dialogs or searching
+  // within Home does not start another headline.
+  useEffect(()=>{
+    const enteringHome=isHome&&!wasHomeRef.current;
+    wasHomeRef.current=isHome;
+    if(enteringHome&&ready&&initializedKey.current===key)advance();
+  },[isHome,ready,key,advance]);
 
   useEffect(()=>{
     const media=window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -65,37 +75,20 @@ export function useHomeHeadline({language,name,email,recentItems,ready,active}:A
   const fullText=headline?.[language]||'';
   const letters=useMemo(()=>Array.from(fullText),[fullText]);
   useEffect(()=>{
-    if(!headline||!active||!visible)return;
-    // Reduced motion uses complete static sentences, with gentle, infrequent swaps.
-    if(reducedMotion){
-      const timer=window.setTimeout(advance,9_000);
+    if(!headline||!active||!visible||reducedMotion||finished)return;
+    if(count>=letters.length){
+      const timer=window.setTimeout(()=>setFinished(true),50);
       return()=>window.clearTimeout(timer);
     }
-    if(phase==='typing'&&count>=letters.length){
-      const timer=window.setTimeout(()=>setPhase('hold'),50);
-      return()=>window.clearTimeout(timer);
-    }
-    if(phase==='typing'){
-      const timer=window.setTimeout(()=>setCount(x=>x+1),55);
-      return()=>window.clearTimeout(timer);
-    }
-    if(phase==='hold'){
-      const timer=window.setTimeout(()=>setPhase('deleting'),4_000);
-      return()=>window.clearTimeout(timer);
-    }
-    if(count>0){
-      const timer=window.setTimeout(()=>setCount(x=>x-1),25);
-      return()=>window.clearTimeout(timer);
-    }
-    const timer=window.setTimeout(advance,120);
+    const timer=window.setTimeout(()=>setCount(x=>x+1),55);
     return()=>window.clearTimeout(timer);
-  },[headline,active,visible,reducedMotion,phase,count,letters.length,advance]);
+  },[headline,active,visible,reducedMotion,finished,count,letters.length]);
 
   return {
     headline,
     fullText,
     writtenText:reducedMotion?fullText:letters.slice(0,count).join(''),
-    showCaret:!reducedMotion,
+    showCaret:!reducedMotion&&!finished&&active&&visible,
     reducedMotion,
   };
 }
