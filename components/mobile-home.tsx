@@ -13,7 +13,7 @@ type Props={
   searching:boolean;
 };
 
-/** Equal-size, tap-friendly mobile actions; inputs live in their own dialogs. */
+/** Shared equal-size action cards for phone and desktop; inputs live in common dialogs. */
 export function MobileHome({
   language,onSearch,onSearchVoice,onRemember,onRememberVoice,
   microphoneEnabled,listening,searching,
@@ -21,6 +21,7 @@ export function MobileHome({
   const no=language==='no';
   return <section className="mobile-home-actions" aria-label={no?'Snarveier på forsiden':'Home shortcuts'}>
     <h1>{no?'Appen som husker for deg':'The app that remembers for you'}<span className="green">.</span></h1>
+    <p className="desktop-home-description">{no?'Finn igjen tingene dine, eller lagre noe nytt på et øyeblikk.':'Find your belongings, or save something new in a moment.'}</p>
     <article className="home-action-card">
       <button type="button" className="home-action-main" onClick={onSearch}
         aria-label={no?'Åpne Finn noe':'Open Find something'}>
