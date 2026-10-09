@@ -450,3 +450,101 @@
 
 /* The desktop sidebar already provides Home / Memory Bank / Settings. Remove redundant top-left breadcrumb. */
 .topbar-right{margin-left:auto}
+
+/* Desktop shell: same icon-and-label navigation as mobile, physically centered. */
+@media(min-width:761px){
+  .main-wrap{margin-left:0}
+  .topbar{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(315px,460px) minmax(0,1fr);
+    align-items:center;
+    gap:18px;
+    width:100%;
+    height:104px;
+    padding:0 clamp(25px,3.3vw,64px);
+    background:var(--background);
+    border-bottom:1px solid var(--border);
+  }
+  .desktop-brand{display:flex;align-items:center;justify-self:start;min-width:0}
+  .desktop-brand .brand{font-size:18px;gap:10px;line-height:1.18}
+  .desktop-brand .brand-icon{width:40px;height:44px}
+  .desktop-brand .brand-icon svg:first-child{width:37px;height:37px}
+  .desktop-brand .brand-icon svg:last-child{fill:var(--background)}
+  .desktop-nav{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    align-items:center;
+    gap:3px;
+    width:100%;
+    justify-self:center;
+  }
+  .desktop-nav button{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    min-height:74px;
+    width:100%;
+    padding:9px 3px;
+    border-radius:13px;
+    color:#969e92;
+    font-size:12px;
+    line-height:1.2;
+    font-weight:500;
+    white-space:nowrap;
+    transition:color .15s,background-color .15s;
+  }
+  .desktop-nav button:hover{background:#e9efe6;color:#58755e}
+  .desktop-nav button.active{color:var(--accent-foreground);font-weight:650}
+  .desktop-nav button svg{width:23px;height:23px}
+  .topbar-right{justify-self:end;margin-left:0;z-index:40}
+  .mobile-brand{display:none}
+  .mobile-nav{display:none}
+  .main-wrap>main{
+    width:100%;
+    max-width:1480px;
+    padding:clamp(22px,2.1vw,38px) clamp(28px,4vw,65px) 48px;
+    margin:0 auto;
+  }
+  .page-home>.mobile-home-actions{row-gap:11px}
+  .page-home>.mobile-home-actions .typewriter-heading{
+    height:135px;
+    min-height:135px;
+    max-height:135px;
+  }
+  .page-home .memories{margin-top:33px}
+  .page-bank .memories{margin-top:9px}
+  .settings{max-width:900px}
+  .toast{left:50%}
+  .memory-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(min-width:761px) and (max-width:960px){
+  .topbar{height:95px;padding:0 25px;gap:12px;grid-template-columns:minmax(0,1fr) 315px minmax(0,1fr)}
+  .desktop-brand .brand{font-size:16px;gap:8px}
+  .desktop-brand .brand-icon{height:38px;width:35px}
+  .desktop-brand .brand-icon svg:first-child{width:33px;height:33px}
+  .desktop-brand .brand-icon svg:last-child{width:14px;height:14px}
+  .desktop-nav button{font-size:11px;min-height:68px;gap:5px}
+  .desktop-nav button svg{width:21px;height:21px}
+  .main-wrap>main{padding:25px 28px 40px}
+  .page-home>.mobile-home-actions .typewriter-heading{height:125px;min-height:125px;max-height:125px}
+  .memory-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(min-width:850px) and (max-width:1050px){
+  .page-home>.mobile-home-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .page-home .home-action-card,.page-home .home-action-main{min-height:192px}
+}
+@media(min-width:761px) and (max-width:849px){
+  .page-home .memories{margin-top:29px}
+}
+@media(max-width:760px){
+  .desktop-brand,.desktop-nav{display:none}
+  .main-wrap{margin-left:0}
+  .topbar{display:flex;justify-content:flex-end}
+  .mobile-brand{display:block}
+  .mobile-nav{display:flex}
+}
+@media(prefers-reduced-motion:reduce){
+  .desktop-nav button{transition:none}
+}
