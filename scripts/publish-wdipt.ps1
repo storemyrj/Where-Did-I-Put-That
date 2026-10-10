@@ -95,8 +95,20 @@ try {
     Write-Output 'Pushing to storemyrj WDIPT main...'
     Run-Git push origin 'HEAD:refs/heads/main'
 
-    $remoteSha = (Git-Value @('ls-remote','origin','refs/heads/main') -split '\s+')[0]
-    if ($remoteSha -ne $sha) { throw 'Push verification failed: remote main does not match local HEAD.' }
+    $verified = $false
+    $remoteSha = ''
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        $remoteRecord = Git-Value @('ls-remote','origin','refs/heads/main')
+        if ($remoteRecord -match '^([0-9a-f]{40})\s+refs/heads/main$') {
+            $remoteSha = $Matches[1]
+            if ($remoteSha -eq $sha) { $verified = $true; break }
+        }
+        Write-Output ('Waiting for remote SHA confirmation (' + $attempt + '/5)...')
+        Start-Sleep -Seconds 2
+    }
+    if (-not $verified) {
+        throw ('Push verification failed. Local: ' + $sha + '; remote: ' + $remoteSha)
+    }
     Write-Output ('OK: VERIFIED_PUSH ' + $sha)
     Write-Output ('Log: ' + $log)
 }
