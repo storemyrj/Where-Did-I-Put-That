@@ -101,6 +101,16 @@ origin and callback in both Google Cloud and the Worker.
    - `GOOGLE_CLIENT_SECRET` = OAuth web application's secret (encrypted)
    - `APP_PUBLIC_ORIGIN` = `https://where-did-i-put-that.storemyrj.workers.dev`
    - `AUTH_PROVIDER` = `google` **only when ready to cut over**
+
+   **Deployment persistence (verified October 2026):** Store all four as
+   Cloudflare **Runtime secrets**, even though the client ID and public
+   origin are not sensitive. The GitHub-connected Worker deployment removed
+   those two settings when they were stored as ordinary Runtime variables,
+   leaving `AUTH_PROVIDER=google` but disabling the login button. Secrets
+   survived the same deployments. Do not confuse **Build variables and
+   secrets** with **Runtime variables and secrets**, and never commit the
+   Google client secret or OAuth tokens. After any deployment, verify the
+   active Worker still has all four binding names before testing sign-in.
 5. While Cloudflare Access still protects the hostname, sign in to Google
    and test account linking, original saved memories, name, photo, search,
    add/edit, and `POST /auth/logout`. Logging out should now show the
